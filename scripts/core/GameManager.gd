@@ -19,15 +19,15 @@ var boss_hp: int = 0
 var boss_max_hp: int = 0
 
 # ---- 扫雷点击次数 ----
-var current_clicks: int = 5
-var max_clicks: int = 5
+var current_clicks: int = 6
+var max_clicks: int = 6
 
 # ---- 炸弹库存 ----
 var bomb_inventory: Dictionary = {}  # bomb_type -> count
 
 # ---- 倒计时 ----
-var turn_timer: float = 30.0
-var turn_duration: float = 30.0
+var turn_timer: float = 45.0
+var turn_duration: float = 45.0
 var timer_running: bool = false
 
 # ---- 临时升级阈值 ----
@@ -123,8 +123,8 @@ func next_floor():
 	triggered_thresholds.clear()
 	bomb_inventory.clear()
 	bomb_inventory_changed.emit()
-	max_clicks = 5 + floor_number
-	turn_duration = min(turn_duration, 120.0)
+	max_clicks = LevelData.get_max_clicks(floor_number)
+	turn_duration = LevelData.get_turn_duration(floor_number)
 	GridManager.reset_for_new_floor()
 	# boss_hp 由 BossGrid.setup() 后 sync_boss_hp() 设置
 

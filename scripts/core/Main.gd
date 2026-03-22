@@ -23,11 +23,85 @@ func _ready():
 	_start_new_floor()
 
 func _start_new_floor():
+	# 显示关卡标题
+	await _show_level_intro()
 	BossGrid.setup()
 	GameManager.init_boss_hp()
 	UpgradeManager.clear_combat_effects()
 	BombPlacer.reset()
 	GameManager.start_turn()
+
+func _show_level_intro():
+	var floor_n = GameManager.floor_number
+	var level_name = LevelData.get_level_name(floor_n)
+	var subtitle = LevelData.get_level_subtitle(floor_n)
+	var level_color = LevelData.get_level_color(floor_n)
+	var cycle = LevelData.get_cycle(floor_n)
+
+	var canvas = CanvasLayer.new()
+	canvas.layer = 90
+	add_child(canvas)
+
+	# 暗背景
+	var bg = ColorRect.new()
+	bg.color = Color(0.02, 0.01, 0.0, 0.85)
+	bg.size = Vector2(1920, 1080)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	canvas.add_child(bg)
+
+	# 层数
+	var floor_label = Label.new()
+	floor_label.text = "第 %d 层" % floor_n
+	floor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	floor_label.position = Vector2(0, 340)
+	floor_label.size = Vector2(1920, 50)
+	floor_label.add_theme_font_size_override("font_size", 32)
+	floor_label.add_theme_color_override("font_color", Color(0.65, 0.6, 0.5))
+	floor_label.modulate = Color(1, 1, 1, 0)
+	bg.add_child(floor_label)
+
+	# 关卡名
+	var title = Label.new()
+	var cycle_mark = "" if cycle == 0 else " · %d周目" % (cycle + 1)
+	title.text = level_name + cycle_mark
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(0, 400)
+	title.size = Vector2(1920, 100)
+	title.add_theme_font_size_override("font_size", 80)
+	title.add_theme_color_override("font_color", level_color)
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	title.add_theme_constant_override("shadow_offset_x", 3)
+	title.add_theme_constant_override("shadow_offset_y", 3)
+	title.modulate = Color(1, 1, 1, 0)
+	bg.add_child(title)
+
+	# 副标题
+	var sub = Label.new()
+	sub.text = subtitle
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.position = Vector2(0, 520)
+	sub.size = Vector2(1920, 50)
+	sub.add_theme_font_size_override("font_size", 26)
+	sub.add_theme_color_override("font_color", Color(0.55, 0.5, 0.42))
+	sub.modulate = Color(1, 1, 1, 0)
+	bg.add_child(sub)
+
+	# ── 动画 ──
+	var tw = create_tween()
+	# 层数淡入
+	tw.tween_property(floor_label, "modulate:a", 1.0, 0.3)
+	# 关卡名从缩放弹入
+	tw.tween_property(title, "modulate:a", 1.0, 0.4)
+	# 副标题淡入
+	tw.tween_property(sub, "modulate:a", 1.0, 0.4)
+	# 停留
+	tw.tween_interval(1.2)
+	# 全部淡出
+	tw.tween_property(bg, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(canvas.queue_free)
+
+	# 等动画结束
+	await tw.finished
 
 func _on_turn_ended():
 	var total_damage := 0
@@ -50,7 +124,8 @@ func _after_detonation(_total_damage: int):
 	GameManager.start_turn()
 
 func _on_boss_attacked():
-	GameManager.take_damage(5)
+	var atk = LevelData.get_boss_attack(GameManager.floor_number)
+	GameManager.take_damage(atk)
 	_screen_shake()
 
 func _screen_shake(intensity: float = 10.0, duration: float = 0.3):

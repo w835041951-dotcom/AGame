@@ -26,20 +26,25 @@ signal core_destroyed  # 由 Main 监听，决定是否弹出临时升级
 
 func setup():
 	boss_attack_multiplier = 1.0
-	move_interval = 60.0
+	var floor_n = GameManager.floor_number
+	move_interval = LevelData.get_boss_move_interval(floor_n)
 	boss_origin = Vector2i(PLACEMENT_COLS - BOSS_COLS, 1)
 	tiles.clear()
 
-	# 初始化所有格子
+	var hp_mult = LevelData.get_hp_multiplier(floor_n)
+
+	# 初始化所有格子（根据关卡数据）
 	for y in range(BOSS_ROWS):
 		for x in range(BOSS_COLS):
 			var pos = Vector2i(x, y)
 			var type = _random_type()
+			var base_hp = _max_hp_for_type(type)
+			var scaled_hp = int(base_hp * hp_mult)
 			tiles[pos] = {
 				"type": type,
 				"part": BodyPart.NONE,
-				"hp": _max_hp_for_type(type),
-				"max_hp": _max_hp_for_type(type),
+				"hp": scaled_hp,
+				"max_hp": scaled_hp,
 				"alive": true
 			}
 
@@ -64,8 +69,8 @@ func refresh_weak_tiles():
 		var pos = alive_positions[i]
 		if tiles[pos]["type"] != TileType.ARMOR:  # 护甲格不变弱点
 			tiles[pos]["type"] = TileType.WEAK
-			tiles[pos]["max_hp"] = 10
-			tiles[pos]["hp"] = min(tiles[pos]["hp"], 10)
+			tiles[pos]["max_hp"] = 5
+			tiles[pos]["hp"] = min(tiles[pos]["hp"], 5)
 	tiles_refreshed.emit()
 
 func get_total_hp() -> int:
@@ -142,15 +147,20 @@ func random_move():
 	move_left()
 
 func _random_type() -> TileType:
+	var weights = LevelData.get_tile_weights(GameManager.floor_number)
 	var roll = randf()
-	if roll < 0.15: return TileType.WEAK
-	elif roll < 0.30: return TileType.ARMOR
-	elif roll < 0.40: return TileType.ABSORB
+	var acc = 0.0
+	acc += weights.get("WEAK", 0.15)
+	if roll < acc: return TileType.WEAK
+	acc += weights.get("ARMOR", 0.15)
+	if roll < acc: return TileType.ARMOR
+	acc += weights.get("ABSORB", 0.10)
+	if roll < acc: return TileType.ABSORB
 	return TileType.NORMAL
 
 func _max_hp_for_type(type: TileType) -> int:
 	match type:
-		TileType.WEAK:   return 10
-		TileType.ARMOR:  return 30
-		TileType.ABSORB: return 15
-		_:               return 20
+		TileType.WEAK:   return 5
+		TileType.ARMOR:  return 15
+		TileType.ABSORB: return 8
+		_:               return 10

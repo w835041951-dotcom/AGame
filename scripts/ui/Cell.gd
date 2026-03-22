@@ -5,7 +5,7 @@ extends Button
 enum Mode { PLACEMENT, MINE }
 enum DisplayState { EMPTY, BOMB_PLACED, BLOCKED, BOSS_NORMAL, BOSS_WEAK, BOSS_ARMOR, BOSS_ABSORB, BOSS_DEAD, EXPLODING, MINE_HIDDEN, MINE_REVEALED, MINE_BOMB }
 
-const SIZE = 76
+const SIZE = 64
 
 var mode: Mode = Mode.PLACEMENT
 var grid_x: int

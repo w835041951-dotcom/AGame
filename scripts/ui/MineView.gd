@@ -28,9 +28,8 @@ func _on_turn_started():
 		if UpgradeManager.is_reveal_bombs():
 			_reveal_all_bombs()
 	else:
-		# 扫雷图已存在，只重新渲染UI（保留翻开状态）
-		_build_grid()
-		_restore_revealed_cells()
+		# 扫雷图已存在，保留格子对象（右键标记保留），只重置可点击性
+		_restore_clickable()
 		if UpgradeManager.is_reveal_bombs():
 			_reveal_all_bombs()
 
@@ -49,6 +48,14 @@ func _build_grid():
 			row.append(cell)
 		cells.append(row)
 
+func _restore_clickable():
+	# 重新开放上回合被点击次数耗尽而禁用的未翻开格子
+	for y in range(GridManager.ROWS):
+		for x in range(GridManager.COLS):
+			var data = GridManager.get_cell(x, y)
+			if data.get("state") == GridManager.CellState.HIDDEN:
+				cells[y][x].disabled = false
+
 func _on_revealed(x: int, y: int, data: Dictionary):
 	cells[y][x].set_display_state(Cell.DisplayState.MINE_REVEALED, {"adjacent": data["adjacent"]})
 	cells[y][x].animate_reveal()
@@ -63,13 +70,3 @@ func _reveal_all_bombs():
 			var cell = GridManager.get_cell(x, y)
 			if cell.get("is_bomb", false) and cell.get("state") == GridManager.CellState.HIDDEN:
 				cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": cell["bomb_type"]})
-
-func _restore_revealed_cells():
-	for y in range(GridManager.ROWS):
-		for x in range(GridManager.COLS):
-			var cell = GridManager.get_cell(x, y)
-			if cell.get("state") == GridManager.CellState.REVEALED:
-				if cell.get("is_bomb", false):
-					cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": cell["bomb_type"], "revealed": true})
-				else:
-					cells[y][x].set_display_state(Cell.DisplayState.MINE_REVEALED, {"adjacent": cell["adjacent"]})

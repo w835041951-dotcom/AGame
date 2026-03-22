@@ -9,7 +9,7 @@ signal bomb_found(x: int, y: int, bomb_type: String)
 
 const COLS = 10
 const ROWS = 5
-const BOMB_COUNT = 8
+var bomb_count: int = 8
 
 var grid: Array = []
 var _grid_generated: bool = false  # 本层是否已生成过扫雷图
@@ -33,7 +33,8 @@ func generate_grid():
 			})
 		grid.append(row)
 
-	# 随机放置炸弹
+	# 随机放置炸弹（数量由关卡决定）
+	bomb_count = LevelData.get_bomb_count(GameManager.floor_number)
 	var positions = []
 	for y in range(ROWS):
 		for x in range(COLS):
@@ -41,7 +42,7 @@ func generate_grid():
 	positions.shuffle()
 
 	var bomb_types = BombRegistry.get_available_types()
-	for i in range(BOMB_COUNT):
+	for i in range(bomb_count):
 		var pos = positions[i]
 		grid[pos.y][pos.x]["is_bomb"] = true
 		grid[pos.y][pos.x]["bomb_type"] = bomb_types[randi() % bomb_types.size()]
