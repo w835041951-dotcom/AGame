@@ -146,7 +146,10 @@ func _bomb_icon(bomb_type: String) -> String:
 func _apply_style(bg: Color, border: Color, border_w: int):
 	var s = StyleBoxFlat.new()
 	s.bg_color = bg
-	s.border_width_all = border_w
+	s.border_width_left = border_w
+	s.border_width_right = border_w
+	s.border_width_top = border_w
+	s.border_width_bottom = border_w
 	s.border_color = border
 	s.corner_radius_top_left = 4
 	s.corner_radius_top_right = 4

@@ -34,7 +34,7 @@ func _on_turn_ended():
 		total_damage = await BombPlacer.detonate()
 	_after_detonation(total_damage)
 
-func _after_detonation(total_damage: int):
+func _after_detonation(_total_damage: int):
 	if GameManager.boss_hp <= 0:
 		return  # boss_defeated 信号已触发，等待处理
 	# Boss行动
