@@ -15,6 +15,7 @@ func _ready():
 	GameManager.turn_ended.connect(_on_turn_ended)
 	GameManager.combat_upgrade_triggered.connect(_on_combat_upgrade)
 	BossGrid.core_destroyed.connect(_on_combat_upgrade)
+	BossGrid.boss_attacked.connect(_on_boss_attacked)
 
 	combat_upgrade_panel.visible = false
 	permanent_upgrade_panel.visible = false
@@ -36,17 +37,18 @@ func _on_turn_ended():
 
 func _after_detonation(_total_damage: int):
 	if GameManager.boss_hp <= 0:
-		return  # boss_defeated 信号已触发，等待处理
-	# Boss行动
+		return
+	# Boss向左移动一格（到左边界时自动触发boss_attacked扣血）
 	await get_tree().create_timer(0.4).timeout
-	BossGrid.random_move()
-	await get_tree().create_timer(0.3).timeout
-	GameManager.take_damage(5)
+	BossGrid.move_left()
+	await get_tree().create_timer(0.2).timeout
 	if GameManager.player_hp <= 0:
 		return
-	await get_tree().create_timer(0.2).timeout
 	BombPlacer.reset()
 	GameManager.start_turn()
+
+func _on_boss_attacked():
+	GameManager.take_damage(5)
 
 func _on_combat_upgrade():
 	# 暂停，显示临时升级

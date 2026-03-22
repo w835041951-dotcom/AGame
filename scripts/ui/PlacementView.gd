@@ -56,7 +56,8 @@ func _refresh_boss_tiles():
 			continue
 		var state = _tile_state(tile)
 		cells[world.y][world.x].set_display_state(state, {
-			"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"]
+			"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"],
+			"local_pos": local_pos
 		})
 
 func _tile_state(tile: Dictionary) -> Cell.DisplayState:
@@ -77,11 +78,13 @@ func _on_bomb_removed(pos: Vector2i):
 		return
 	if BossGrid.is_boss_tile(pos):
 		var tile = BossGrid.get_tile(pos)
+		var local_pos = BossGrid.world_to_local(pos)
 		if tile.is_empty():
 			cells[pos.y][pos.x].set_display_state(Cell.DisplayState.EMPTY)
 		else:
 			cells[pos.y][pos.x].set_display_state(_tile_state(tile), {
-				"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"]
+				"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"],
+				"local_pos": local_pos
 			})
 	else:
 		cells[pos.y][pos.x].set_display_state(Cell.DisplayState.EMPTY)
@@ -92,4 +95,4 @@ func _on_boss_moved(_new_origin: Vector2i):
 func _on_tile_destroyed(local_pos: Vector2i, _part):
 	var world = BossGrid.local_to_world(local_pos)
 	if world.y < cells.size() and world.x < cells[world.y].size():
-		cells[world.y][world.x].set_display_state(Cell.DisplayState.BOSS_DEAD)
+		cells[world.y][world.x].set_display_state(Cell.DisplayState.BOSS_DEAD, {"local_pos": local_pos})

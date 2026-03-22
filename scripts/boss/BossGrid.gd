@@ -11,7 +11,7 @@ const BOSS_COLS = 4
 const BOSS_ROWS = 3
 
 # boss_origin: Boss左上角在放置区的世界坐标
-var boss_origin: Vector2i = Vector2i(3, 1)
+var boss_origin: Vector2i = Vector2i(PLACEMENT_COLS - BOSS_COLS, 1)
 
 # tiles: Vector2i(局部坐标) -> {type, part, hp, max_hp, alive}
 var tiles: Dictionary = {}
@@ -27,6 +27,7 @@ signal core_destroyed  # 由 Main 监听，决定是否弹出临时升级
 func setup():
 	boss_attack_multiplier = 1.0
 	move_interval = 60.0
+	boss_origin = Vector2i(PLACEMENT_COLS - BOSS_COLS, 1)
 	tiles.clear()
 
 	# 初始化所有格子
@@ -127,19 +128,21 @@ func _on_tile_destroyed(local_pos: Vector2i, tile: Dictionary):
 		BodyPart.CORE:
 			core_destroyed.emit()
 
-func move(direction: Vector2i):
-	var new_origin = boss_origin + direction
-	# 确保不超出放置区边界
-	new_origin.x = clamp(new_origin.x, 0, PLACEMENT_COLS - BOSS_COLS)
-	new_origin.y = clamp(new_origin.y, 0, PLACEMENT_ROWS - BOSS_ROWS)
-	if new_origin != boss_origin:
-		boss_origin = new_origin
+signal boss_attacked  # Boss走出左边界，攻击玩家
+
+func move_left():
+	# Boss每回合向左移动一格
+	if boss_origin.x > 0:
+		boss_origin.x -= 1
+		boss_moved.emit(boss_origin)
+	else:
+		# 已到左边界 → 攻击玩家 → 重置到右侧
+		boss_attacked.emit()
+		boss_origin.x = PLACEMENT_COLS - BOSS_COLS
 		boss_moved.emit(boss_origin)
 
 func random_move():
-	var dirs = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
-	dirs.shuffle()
-	move(dirs[0])
+	move_left()
 
 func _random_type() -> TileType:
 	var roll = randf()
