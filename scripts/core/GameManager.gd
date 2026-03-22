@@ -76,6 +76,9 @@ func use_bomb(type: String) -> bool:
 	return true
 
 func _check_no_bomb_no_mine():
+	check_no_bomb_no_mine()
+
+func check_no_bomb_no_mine():
 	# 如果炸弹用完（含放置区）且探索区没有未翻开格，判断为无路可走
 	if total_bombs() > 0:
 		return

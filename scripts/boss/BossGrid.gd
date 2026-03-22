@@ -60,12 +60,12 @@ func setup():
 			"alive": true
 		}
 
-	# 随机分配关键部位
+	# 随机分配关键部位（至少需要3个格子）
 	var positions = tiles.keys().duplicate()
 	positions.shuffle()
-	tiles[positions[0]]["part"] = BodyPart.HEAD
-	tiles[positions[1]]["part"] = BodyPart.LEG
-	tiles[positions[2]]["part"] = BodyPart.CORE
+	if positions.size() >= 1: tiles[positions[0]]["part"] = BodyPart.HEAD
+	if positions.size() >= 2: tiles[positions[1]]["part"] = BodyPart.LEG
+	if positions.size() >= 3: tiles[positions[2]]["part"] = BodyPart.CORE
 
 	tiles_refreshed.emit()
 

@@ -236,6 +236,7 @@ func _show_attack_label(text: String, color: Color):
 	lbl.add_theme_constant_override("shadow_offset_x", 4)
 	lbl.add_theme_constant_override("shadow_offset_y", 4)
 	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 60)  # 相对于label自身的中心点
 	canvas.add_child(lbl)
 	var tw = create_tween()
 	tw.tween_property(lbl, "modulate:a", 1.0, 0.12)
@@ -261,6 +262,8 @@ func _on_combat_upgrade():
 	_animate_panel_in(combat_upgrade_panel)
 
 func _on_boss_defeated():
+	# 关掉可能还在等待的临时升级面板，避免 _wait_for_combat_upgrade 死锁
+	combat_upgrade_panel.visible = false
 	# 先等爆炸动画看完
 	await get_tree().create_timer(0.8).timeout
 	# 结算正确标记回血

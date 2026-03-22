@@ -74,7 +74,8 @@ func reveal_cell(x: int, y: int):
 		grid_revealed.emit(x, y, cell)
 		if cell["adjacent"] == 0:
 			_auto_reveal(x, y)
-	GameManager._check_no_bomb_no_mine()
+	# 检查是否无路可走（在 _auto_reveal 完成后再检查，避免漏检）
+	GameManager.check_no_bomb_no_mine()
 
 func _auto_reveal(start_x: int, start_y: int):
 	var queue = [Vector2i(start_x, start_y)]
@@ -132,5 +133,6 @@ func reveal_area(cx: int, cy: int, radius: int = 1):
 			if cell["is_bomb"]:
 				GameManager.add_bomb(cell["bomb_type"])
 				bomb_found.emit(nx, ny, cell["bomb_type"])
-			grid_revealed.emit(nx, ny, cell)
+			else:
+				grid_revealed.emit(nx, ny, cell)
 	is_magic_reveal = false

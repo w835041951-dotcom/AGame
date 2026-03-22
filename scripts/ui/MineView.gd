@@ -23,8 +23,8 @@ func _on_clicks_exhausted():
 
 func _on_turn_started():
 	if GridManager.grid.is_empty():
-		_build_grid()
 		GridManager.generate_grid()
+		_build_grid()
 		if UpgradeManager.is_reveal_bombs():
 			_reveal_all_bombs()
 	else:
