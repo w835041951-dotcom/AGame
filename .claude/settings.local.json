@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:kenney.nl)",
+      "WebSearch",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \":*)"
+    ]
+  }
+}

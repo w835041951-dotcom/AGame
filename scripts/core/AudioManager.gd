@@ -16,29 +16,29 @@ var sfx_volume: float = 1.0
 
 # BGM 文件路径映射
 const BGM_TRACKS = {
-	"battle":   "res://assets/audio/bgm/battle.ogg",
-	"boss":     "res://assets/audio/bgm/boss.ogg",
-	"upgrade":  "res://assets/audio/bgm/upgrade.ogg",
-	"gameover": "res://assets/audio/bgm/gameover.ogg",
+	"battle":   "res://assets/audio/bgm/battle.wav",
+	"boss":     "res://assets/audio/bgm/boss.wav",
+	"upgrade":  "res://assets/audio/bgm/upgrade.wav",
+	"gameover": "res://assets/audio/bgm/gameover.wav",
 }
 
 # 音效文件路径映射
 const SFX_FILES = {
-	"bomb_place":    "res://assets/audio/sfx/bomb_place.wav",
-	"bomb_remove":   "res://assets/audio/sfx/bomb_remove.wav",
-	"detonate":      "res://assets/audio/sfx/detonate.wav",
-	"explosion":     "res://assets/audio/sfx/explosion.wav",
-	"tile_break":    "res://assets/audio/sfx/tile_break.wav",
-	"boss_hit":      "res://assets/audio/sfx/boss_hit.wav",
-	"weak_hit":      "res://assets/audio/sfx/weak_hit.wav",   # 命中弱点
-	"chain":         "res://assets/audio/sfx/chain.wav",
-	"mine_reveal":   "res://assets/audio/sfx/mine_reveal.wav",
-	"mine_bomb":     "res://assets/audio/sfx/mine_bomb.wav",  # 扫雷翻到炸弹
-	"upgrade_pick":  "res://assets/audio/sfx/upgrade_pick.wav",
-	"boss_move":     "res://assets/audio/sfx/boss_move.wav",
-	"player_hit":    "res://assets/audio/sfx/player_hit.wav",
-	"ui_click":      "res://assets/audio/sfx/ui_click.wav",
-	"timer_warn":    "res://assets/audio/sfx/timer_warn.wav", # 倒计时10秒
+	"bomb_place":    "res://assets/audio/sfx/bomb_place.ogg",
+	"bomb_remove":   "res://assets/audio/sfx/bomb_remove.ogg",
+	"detonate":      "res://assets/audio/sfx/detonate.ogg",
+	"explosion":     "res://assets/audio/sfx/explosion.ogg",
+	"tile_break":    "res://assets/audio/sfx/tile_break.ogg",
+	"boss_hit":      "res://assets/audio/sfx/boss_hit.ogg",
+	"weak_hit":      "res://assets/audio/sfx/weak_hit.ogg",
+	"chain":         "res://assets/audio/sfx/chain.ogg",
+	"mine_reveal":   "res://assets/audio/sfx/mine_reveal.ogg",
+	"mine_bomb":     "res://assets/audio/sfx/mine_bomb.ogg",
+	"upgrade_pick":  "res://assets/audio/sfx/upgrade_pick.ogg",
+	"boss_move":     "res://assets/audio/sfx/boss_move.ogg",
+	"player_hit":    "res://assets/audio/sfx/player_hit.ogg",
+	"ui_click":      "res://assets/audio/sfx/ui_click.ogg",
+	"timer_warn":    "res://assets/audio/sfx/timer_warn.ogg",
 }
 
 var _current_bgm: String = ""

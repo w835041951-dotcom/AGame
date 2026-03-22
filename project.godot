@@ -6,8 +6,8 @@ config_version=5
 
 [application]
 
-config/name="MineSweeper Roguelite"
-config/description="Find bombs to stock up, place and detonate to defeat the boss"
+config/name="炸弹人勇闯100层地牢"
+config/description="扫雷找炸弹，放置炸弹打Boss，勇闯100层地牢"
 run/main_scene="res://scenes/game/Main.tscn"
 config/features=PackedStringArray("4.2", "Forward Plus")
 config/icon="res://icon.svg"
