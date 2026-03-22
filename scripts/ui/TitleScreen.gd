@@ -55,9 +55,9 @@ func _setup_scene():
 	var title_lbl = Label.new()
 	title_lbl.text = "炸弹人勇闯地牢"
 	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	title_lbl.position.y = 80
-	title_lbl.size.y = 120
+	title_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	title_lbl.position = Vector2(0, 80)
+	title_lbl.size = Vector2(1920, 120)
 	title_lbl.add_theme_font_size_override("font_size", 72)
 	title_lbl.add_theme_color_override("font_color", Color(0.95, 0.80, 0.20))
 	title_lbl.add_theme_color_override("font_shadow_color", Color(0.5, 0.15, 0.0, 0.9))
@@ -68,17 +68,17 @@ func _setup_scene():
 	var sub_lbl = Label.new()
 	sub_lbl.text = "BOMBER DUNGEON  100 FLOORS"
 	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub_lbl.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	sub_lbl.position.y = 168
-	sub_lbl.size.y = 40
+	sub_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	sub_lbl.position = Vector2(0, 168)
+	sub_lbl.size = Vector2(1920, 40)
 	sub_lbl.add_theme_font_size_override("font_size", 22)
 	sub_lbl.add_theme_color_override("font_color", Color(0.65, 0.55, 0.35))
 	add_child(sub_lbl)
 
 	# ── 菜单容器 ──
 	var menu_vbox = VBoxContainer.new()
-	menu_vbox.set_anchors_preset(Control.PRESET_CENTER)
-	menu_vbox.position = Vector2(1920/2.0 - 180, 500)
+	menu_vbox.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	menu_vbox.position = Vector2(1920 / 2.0 - 180, 340)
 	menu_vbox.size = Vector2(360, 280)
 	menu_vbox.add_theme_constant_override("separation", 16)
 	add_child(menu_vbox)
@@ -105,8 +105,9 @@ func _setup_scene():
 	# ── 版权/版本 ──
 	var ver_lbl = Label.new()
 	ver_lbl.text = "v0.1  --  MADE WITH GODOT 4"
-	ver_lbl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	ver_lbl.position.y = -36
+	ver_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	ver_lbl.position = Vector2(0, 1080 - 36)
+	ver_lbl.size = Vector2(1920, 28)
 	ver_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ver_lbl.add_theme_font_size_override("font_size", 14)
 	ver_lbl.add_theme_color_override("font_color", Color(0.35, 0.32, 0.28))
@@ -115,8 +116,9 @@ func _setup_scene():
 	# ── 操作提示 ──
 	var hint_lbl = Label.new()
 	hint_lbl.text = "↑↓ 选择    ENTER / 点击 确认"
-	hint_lbl.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	hint_lbl.position.y = -60
+	hint_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	hint_lbl.position = Vector2(0, 1080 - 68)
+	hint_lbl.size = Vector2(1920, 28)
 	hint_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_lbl.add_theme_font_size_override("font_size", 16)
 	hint_lbl.add_theme_color_override("font_color", Color(0.55, 0.50, 0.40))
