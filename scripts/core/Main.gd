@@ -26,14 +26,41 @@ func _start_new_floor():
 	# 显示关卡标题
 	await _show_level_intro()
 	BossGrid.setup()
+	_layout_views()
 	GameManager.init_boss_hp()
 	UpgradeManager.clear_combat_effects()
 	BombPlacer.reset()
 	GameManager.start_turn()
 
+func _layout_views():
+	# 根据当前层的棋盘大小动态计算布局
+	var floor_n = GameManager.floor_number
+	var cs = LevelData.get_cell_size(floor_n)
+	var p_cols = BossGrid.placement_cols
+	var p_rows = BossGrid.placement_rows
+	var m_cols = GridManager.cols if GridManager.cols > 1 else LevelData.get_mine_cols(floor_n)
+	var m_rows = LevelData.get_mine_rows(floor_n)
+	var p_width = p_cols * cs
+	var p_height = p_rows * cs
+	var m_width = m_cols * cs
+	var m_height = m_rows * cs
+
+	# 放置区居中
+	var hud_h = 68
+	var sel_h = 64
+	var gap = 4
+	var total_h = p_height + sel_h + m_height + gap * 2
+	var start_y = hud_h + max(0, (1080 - hud_h - total_h) / 2)
+
+	placement_view.position = Vector2((1920 - p_width) / 2, start_y)
+	bomb_selector.position.y = start_y + p_height + gap
+	bomb_selector.size.x = 1920
+	mine_view.position = Vector2((1920 - m_width) / 2, start_y + p_height + sel_h + gap * 2)
+
 func _show_level_intro():
 	var floor_n = GameManager.floor_number
 	var level_name = LevelData.get_level_name(floor_n)
+	var boss_name = LevelData.get_boss_name(floor_n)
 	var subtitle = LevelData.get_level_subtitle(floor_n)
 	var level_color = LevelData.get_level_color(floor_n)
 	var cycle = LevelData.get_cycle(floor_n)
@@ -65,7 +92,7 @@ func _show_level_intro():
 	var cycle_mark = "" if cycle == 0 else " · %d周目" % (cycle + 1)
 	title.text = level_name + cycle_mark
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 400)
+	title.position = Vector2(0, 380)
 	title.size = Vector2(1920, 100)
 	title.add_theme_font_size_override("font_size", 80)
 	title.add_theme_color_override("font_color", level_color)
@@ -75,11 +102,22 @@ func _show_level_intro():
 	title.modulate = Color(1, 1, 1, 0)
 	bg.add_child(title)
 
+	# Boss名字
+	var boss_label = Label.new()
+	boss_label.text = "Boss: " + boss_name
+	boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_label.position = Vector2(0, 490)
+	boss_label.size = Vector2(1920, 50)
+	boss_label.add_theme_font_size_override("font_size", 34)
+	boss_label.add_theme_color_override("font_color", Color(0.85, 0.35, 0.25))
+	boss_label.modulate = Color(1, 1, 1, 0)
+	bg.add_child(boss_label)
+
 	# 副标题
 	var sub = Label.new()
 	sub.text = subtitle
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.position = Vector2(0, 520)
+	sub.position = Vector2(0, 550)
 	sub.size = Vector2(1920, 50)
 	sub.add_theme_font_size_override("font_size", 26)
 	sub.add_theme_color_override("font_color", Color(0.55, 0.5, 0.42))
@@ -88,15 +126,11 @@ func _show_level_intro():
 
 	# ── 动画 ──
 	var tw = create_tween()
-	# 层数淡入
 	tw.tween_property(floor_label, "modulate:a", 1.0, 0.3)
-	# 关卡名从缩放弹入
 	tw.tween_property(title, "modulate:a", 1.0, 0.4)
-	# 副标题淡入
+	tw.tween_property(boss_label, "modulate:a", 1.0, 0.3)
 	tw.tween_property(sub, "modulate:a", 1.0, 0.4)
-	# 停留
 	tw.tween_interval(1.2)
-	# 全部淡出
 	tw.tween_property(bg, "modulate:a", 0.0, 0.5)
 	tw.tween_callback(canvas.queue_free)
 
@@ -104,12 +138,17 @@ func _show_level_intro():
 	await tw.finished
 
 func _on_turn_ended():
-	var total_damage := 0
 	if BombPlacer.phase == BombPlacer.Phase.PLACING:
-		total_damage = await BombPlacer.detonate()
-	_after_detonation(total_damage)
+		await BombPlacer.detonate()
+	# 等待临时升级面板（如有）关闭后再继续
+	await _wait_for_combat_upgrade()
+	_after_detonation()
 
-func _after_detonation(_total_damage: int):
+func _wait_for_combat_upgrade():
+	while combat_upgrade_panel.visible:
+		await get_tree().process_frame
+
+func _after_detonation():
 	if GameManager.boss_hp <= 0:
 		return
 	await get_tree().create_timer(0.4).timeout
@@ -267,7 +306,7 @@ func _show_game_over_screen():
 # 升级选完后继续（由 UpgradePanel 回调）
 func on_combat_upgrade_chosen():
 	combat_upgrade_panel.visible = false
-	GameManager.timer_running = true  # 恢复倒计时
+	# 回合流程由 _wait_for_combat_upgrade() 继续，无需手动恢复计时器
 
 func on_permanent_upgrade_chosen():
 	permanent_upgrade_panel.visible = false

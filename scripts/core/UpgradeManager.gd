@@ -81,8 +81,8 @@ func apply_combat(upgrade: Dictionary):
 			active_combat["reveal_bombs"] = true
 			reveal_bombs_triggered.emit()
 		"reveal_area":
-			var cx = randi_range(2, GridManager.COLS - 3)
-			var cy = randi_range(2, GridManager.ROWS - 3)
+			var cx = randi_range(2, GridManager.cols - 3)
+			var cy = randi_range(2, GridManager.rows - 3)
 			GridManager.reveal_area(cx, cy, 2)
 		"freeze_boss":
 			active_combat["freeze_boss"] = true

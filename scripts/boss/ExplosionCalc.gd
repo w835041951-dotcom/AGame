@@ -32,7 +32,7 @@ func _rect(origin: Vector2i, half: int) -> Array:
 
 func _pierce(origin: Vector2i) -> Array:
 	var cells = []
-	for x in range(BossGrid.PLACEMENT_COLS):
+	for x in range(BossGrid.placement_cols):
 		cells.append(Vector2i(x, origin.y))
 	return cells
 
@@ -45,10 +45,10 @@ func _bounce(origin: Vector2i) -> Array:
 		if not cells.has(pos):
 			cells.append(pos)
 		var next = pos + dir
-		if next.x < 0 or next.x >= BossGrid.PLACEMENT_COLS:
+		if next.x < 0 or next.x >= BossGrid.placement_cols:
 			dir.x = -dir.x
 			bounces += 1
-		elif next.y < 0 or next.y >= BossGrid.PLACEMENT_ROWS:
+		elif next.y < 0 or next.y >= BossGrid.placement_rows:
 			dir.y = -dir.y
 			bounces += 1
 		else:

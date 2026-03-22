@@ -1,17 +1,17 @@
 ## Boss 区域数据管理 - AutoLoad
+## 支持动态棋盘大小和不规则Boss形状
 
 extends Node
 
 enum TileType { NORMAL, WEAK, ARMOR, ABSORB }
 enum BodyPart { NONE, HEAD, LEG, CORE }
 
-const PLACEMENT_COLS = 10
-const PLACEMENT_ROWS = 6
-const BOSS_COLS = 4
-const BOSS_ROWS = 3
+# 当前层动态尺寸（每层 setup() 时从 LevelData 读取）
+var placement_cols: int = 10
+var placement_rows: int = 6
 
 # boss_origin: Boss左上角在放置区的世界坐标
-var boss_origin: Vector2i = Vector2i(PLACEMENT_COLS - BOSS_COLS, 1)
+var boss_origin: Vector2i = Vector2i(6, 1)
 
 # tiles: Vector2i(局部坐标) -> {type, part, hp, max_hp, alive}
 var tiles: Dictionary = {}
@@ -19,36 +19,48 @@ var tiles: Dictionary = {}
 var boss_attack_multiplier: float = 1.0
 var move_interval: float = 60.0
 
+# Boss形状的包围盒（用于计算初始位置和移动边界）
+var boss_width: int = 4
+var boss_height: int = 3
+
 signal boss_moved(new_origin: Vector2i)
 signal tiles_refreshed
 signal tile_destroyed(local_pos: Vector2i, part: BodyPart)
-signal core_destroyed  # 由 Main 监听，决定是否弹出临时升级
+signal core_destroyed
 
 func setup():
 	boss_attack_multiplier = 1.0
 	var floor_n = GameManager.floor_number
 	move_interval = LevelData.get_boss_move_interval(floor_n)
-	boss_origin = Vector2i(PLACEMENT_COLS - BOSS_COLS, 1)
+
+	# 从 LevelData 读取动态棋盘大小
+	placement_cols = LevelData.get_placement_cols(floor_n)
+	placement_rows = LevelData.get_placement_rows(floor_n)
+
+	# 获取 Boss 形状
+	var shape = LevelData.get_boss_shape(floor_n)
+	_calc_boss_bounds(shape)
+
+	# Boss 初始位置：靠右，垂直居中
+	boss_origin = Vector2i(placement_cols - boss_width, max(0, (placement_rows - boss_height) / 2))
 	tiles.clear()
 
 	var hp_mult = LevelData.get_hp_multiplier(floor_n)
 
-	# 初始化所有格子（根据关卡数据）
-	for y in range(BOSS_ROWS):
-		for x in range(BOSS_COLS):
-			var pos = Vector2i(x, y)
-			var type = _random_type()
-			var base_hp = _max_hp_for_type(type)
-			var scaled_hp = int(base_hp * hp_mult)
-			tiles[pos] = {
-				"type": type,
-				"part": BodyPart.NONE,
-				"hp": scaled_hp,
-				"max_hp": scaled_hp,
-				"alive": true
-			}
+	# 按形状生成格子
+	for pos in shape:
+		var type = _random_type()
+		var base_hp = _max_hp_for_type(type)
+		var scaled_hp = int(base_hp * hp_mult)
+		tiles[pos] = {
+			"type": type,
+			"part": BodyPart.NONE,
+			"hp": scaled_hp,
+			"max_hp": scaled_hp,
+			"alive": true
+		}
 
-	# 随机分配关键部位（各一个）
+	# 随机分配关键部位
 	var positions = tiles.keys().duplicate()
 	positions.shuffle()
 	tiles[positions[0]]["part"] = BodyPart.HEAD
@@ -56,6 +68,15 @@ func setup():
 	tiles[positions[2]]["part"] = BodyPart.CORE
 
 	tiles_refreshed.emit()
+
+func _calc_boss_bounds(shape: Array):
+	var max_x = 0
+	var max_y = 0
+	for pos in shape:
+		if pos.x > max_x: max_x = pos.x
+		if pos.y > max_y: max_y = pos.y
+	boss_width = max_x + 1
+	boss_height = max_y + 1
 
 func refresh_weak_tiles():
 	# 每回合重新随机 2~3 个存活格为 WEAK

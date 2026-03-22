@@ -4,7 +4,7 @@ extends Control
 
 const CellScene = preload("res://scenes/game/Cell.tscn")
 const Cell = preload("res://scripts/ui/Cell.gd")
-const CELL_SIZE = 64
+var cell_size: int = 64
 
 var cells: Array = []  # cells[y][x]
 
@@ -26,13 +26,14 @@ func _build_grid():
 	for child in get_children():
 		child.queue_free()
 
-	for y in range(BossGrid.PLACEMENT_ROWS):
+	cell_size = LevelData.get_cell_size(GameManager.floor_number)
+	for y in range(BossGrid.placement_rows):
 		var row = []
-		for x in range(BossGrid.PLACEMENT_COLS):
+		for x in range(BossGrid.placement_cols):
 			var cell = CellScene.instantiate()
 			add_child(cell)
-			cell.position = Vector2(x * CELL_SIZE, y * CELL_SIZE)
-			cell.setup(x, y, Cell.Mode.PLACEMENT)
+			cell.position = Vector2(x * cell_size, y * cell_size)
+			cell.setup(x, y, Cell.Mode.PLACEMENT, cell_size)
 			row.append(cell)
 		cells.append(row)
 
@@ -40,8 +41,8 @@ func _refresh_boss_tiles():
 	if cells.is_empty():
 		return
 	# 先把所有格子设回 EMPTY
-	for y in range(BossGrid.PLACEMENT_ROWS):
-		for x in range(BossGrid.PLACEMENT_COLS):
+	for y in range(BossGrid.placement_rows):
+		for x in range(BossGrid.placement_cols):
 			var world = Vector2i(x, y)
 			if BombPlacer.placed_bombs.has(world):
 				continue  # 已放炸弹的格子不覆盖
@@ -51,9 +52,9 @@ func _refresh_boss_tiles():
 	for local_pos in BossGrid.tiles:
 		var tile = BossGrid.tiles[local_pos]
 		var world = BossGrid.local_to_world(local_pos)
-		if world.x < 0 or world.x >= BossGrid.PLACEMENT_COLS:
+		if world.x < 0 or world.x >= BossGrid.placement_cols:
 			continue
-		if world.y < 0 or world.y >= BossGrid.PLACEMENT_ROWS:
+		if world.y < 0 or world.y >= BossGrid.placement_rows:
 			continue
 		var state = _tile_state(tile)
 		cells[world.y][world.x].set_display_state(state, {
@@ -98,7 +99,7 @@ func _on_boss_moved(_new_origin: Vector2i):
 		if not BossGrid.tiles[local_pos]["alive"]:
 			continue
 		var world = BossGrid.local_to_world(local_pos)
-		if world.x >= 0 and world.x < BossGrid.PLACEMENT_COLS and world.y >= 0 and world.y < BossGrid.PLACEMENT_ROWS:
+		if world.x >= 0 and world.x < BossGrid.placement_cols and world.y >= 0 and world.y < BossGrid.placement_rows:
 			cells[world.y][world.x].animate_boss_pulse()
 
 func _on_tile_destroyed(local_pos: Vector2i, _part):

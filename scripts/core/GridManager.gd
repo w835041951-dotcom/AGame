@@ -7,24 +7,31 @@ extends Node
 signal grid_revealed(x: int, y: int, cell_data: Dictionary)
 signal bomb_found(x: int, y: int, bomb_type: String)
 
-const COLS = 10
-const ROWS = 5
+# 动态尺寸，每层 setup 时从 LevelData 更新
+var cols: int = 10
+var rows: int = 5
 var bomb_count: int = 8
 
 var grid: Array = []
-var _grid_generated: bool = false  # 本层是否已生成过扫雷图
+var _grid_generated: bool = false
 
 enum CellState { HIDDEN, REVEALED }
 
 func generate_grid():
-	# 每层只生成一次，多回合共用同一张扫雷图
 	if _grid_generated:
 		return
 	_grid_generated = true
+
+	# 从 LevelData 读取当前层的扫雷大小
+	var floor_n = GameManager.floor_number
+	cols = LevelData.get_mine_cols(floor_n)
+	rows = LevelData.get_mine_rows(floor_n)
+	bomb_count = LevelData.get_bomb_count(floor_n)
+
 	grid.clear()
-	for y in range(ROWS):
+	for y in range(rows):
 		var row = []
-		for x in range(COLS):
+		for x in range(cols):
 			row.append({
 				"state": CellState.HIDDEN,
 				"is_bomb": false,
@@ -33,11 +40,9 @@ func generate_grid():
 			})
 		grid.append(row)
 
-	# 随机放置炸弹（数量由关卡决定）
-	bomb_count = LevelData.get_bomb_count(GameManager.floor_number)
 	var positions = []
-	for y in range(ROWS):
-		for x in range(COLS):
+	for y in range(rows):
+		for x in range(cols):
 			positions.append(Vector2i(x, y))
 	positions.shuffle()
 
@@ -47,9 +52,8 @@ func generate_grid():
 		grid[pos.y][pos.x]["is_bomb"] = true
 		grid[pos.y][pos.x]["bomb_type"] = bomb_types[randi() % bomb_types.size()]
 
-	# 计算相邻数字
-	for y in range(ROWS):
-		for x in range(COLS):
+	for y in range(rows):
+		for x in range(cols):
 			if not grid[y][x]["is_bomb"]:
 				grid[y][x]["adjacent"] = _count_adjacent(x, y)
 
@@ -69,6 +73,7 @@ func reveal_cell(x: int, y: int):
 		grid_revealed.emit(x, y, cell)
 		if cell["adjacent"] == 0:
 			_auto_reveal(x, y)
+	GameManager._check_no_bomb_no_mine()
 
 func _auto_reveal(start_x: int, start_y: int):
 	var queue = [Vector2i(start_x, start_y)]
@@ -80,7 +85,7 @@ func _auto_reveal(start_x: int, start_y: int):
 					continue
 				var nx = pos.x + dx
 				var ny = pos.y + dy
-				if nx >= 0 and nx < COLS and ny >= 0 and ny < ROWS:
+				if nx >= 0 and nx < cols and ny >= 0 and ny < rows:
 					var nb = grid[ny][nx]
 					if nb["state"] == CellState.HIDDEN and not nb["is_bomb"]:
 						nb["state"] = CellState.REVEALED
@@ -96,13 +101,13 @@ func _count_adjacent(x: int, y: int) -> int:
 				continue
 			var nx = x + dx
 			var ny = y + dy
-			if nx >= 0 and nx < COLS and ny >= 0 and ny < ROWS:
+			if nx >= 0 and nx < cols and ny >= 0 and ny < rows:
 				if grid[ny][nx]["is_bomb"]:
 					count += 1
 	return count
 
 func get_cell(x: int, y: int) -> Dictionary:
-	if x < 0 or x >= COLS or y < 0 or y >= ROWS:
+	if x < 0 or x >= cols or y < 0 or y >= rows:
 		return {}
 	return grid[y][x]
 
@@ -116,7 +121,7 @@ func reveal_area(cx: int, cy: int, radius: int = 1):
 		for dx in range(-radius, radius + 1):
 			var nx = cx + dx
 			var ny = cy + dy
-			if nx < 0 or nx >= COLS or ny < 0 or ny >= ROWS:
+			if nx < 0 or nx >= cols or ny < 0 or ny >= rows:
 				continue
 			var cell = grid[ny][nx]
 			if cell["state"] != CellState.HIDDEN:

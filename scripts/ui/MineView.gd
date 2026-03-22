@@ -4,7 +4,7 @@ extends Control
 
 const CellScene = preload("res://scenes/game/Cell.tscn")
 const Cell = preload("res://scripts/ui/Cell.gd")
-const CELL_SIZE = 64
+var cell_size: int = 64
 
 var cells: Array = []
 
@@ -38,20 +38,20 @@ func _build_grid():
 	for child in get_children():
 		child.queue_free()
 
-	for y in range(GridManager.ROWS):
+	cell_size = LevelData.get_cell_size(GameManager.floor_number)
+	for y in range(GridManager.rows):
 		var row = []
-		for x in range(GridManager.COLS):
+		for x in range(GridManager.cols):
 			var cell = CellScene.instantiate()
 			add_child(cell)
-			cell.position = Vector2(x * CELL_SIZE, y * CELL_SIZE)
-			cell.setup(x, y, Cell.Mode.MINE)
+			cell.position = Vector2(x * cell_size, y * cell_size)
+			cell.setup(x, y, Cell.Mode.MINE, cell_size)
 			row.append(cell)
 		cells.append(row)
 
 func _restore_clickable():
-	# 重新开放上回合被点击次数耗尽而禁用的未翻开格子
-	for y in range(GridManager.ROWS):
-		for x in range(GridManager.COLS):
+	for y in range(GridManager.rows):
+		for x in range(GridManager.cols):
 			var data = GridManager.get_cell(x, y)
 			if data.get("state") == GridManager.CellState.HIDDEN:
 				cells[y][x].disabled = false
@@ -65,8 +65,8 @@ func _on_bomb_found(x: int, y: int, bomb_type: String):
 	cells[y][x].animate_reveal()
 
 func _reveal_all_bombs():
-	for y in range(GridManager.ROWS):
-		for x in range(GridManager.COLS):
+	for y in range(GridManager.rows):
+		for x in range(GridManager.cols):
 			var cell = GridManager.get_cell(x, y)
 			if cell.get("is_bomb", false) and cell.get("state") == GridManager.CellState.HIDDEN:
 				cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": cell["bomb_type"]})

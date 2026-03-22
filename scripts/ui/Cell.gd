@@ -5,7 +5,8 @@ extends Button
 enum Mode { PLACEMENT, MINE }
 enum DisplayState { EMPTY, BOMB_PLACED, BLOCKED, BOSS_NORMAL, BOSS_WEAK, BOSS_ARMOR, BOSS_ABSORB, BOSS_DEAD, EXPLODING, MINE_HIDDEN, MINE_REVEALED, MINE_BOMB }
 
-const SIZE = 64
+const SIZE = 64  # 默认值，运行时由 setup() 覆盖
+var cell_size: int = 64
 
 var mode: Mode = Mode.PLACEMENT
 var grid_x: int
@@ -36,14 +37,15 @@ static var _boss_texture: Texture2D = null
 
 var _marked_safe: bool = false  # 右键标记为"安全/空"
 
-func setup(x: int, y: int, m: Mode):
+func setup(x: int, y: int, m: Mode, sz: int = 64):
 	grid_x = x
 	grid_y = y
 	mode = m
-	custom_minimum_size = Vector2(SIZE, SIZE)
-	size = Vector2(SIZE, SIZE)
+	cell_size = sz
+	custom_minimum_size = Vector2(cell_size, cell_size)
+	size = Vector2(cell_size, cell_size)
 	text = ""
-	add_theme_font_size_override("font_size", 20)
+	add_theme_font_size_override("font_size", max(12, cell_size / 3))
 	set_display_state(DisplayState.MINE_HIDDEN if mode == Mode.MINE else DisplayState.EMPTY)
 	pressed.connect(_on_pressed)
 
