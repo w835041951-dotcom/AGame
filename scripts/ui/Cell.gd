@@ -1,4 +1,4 @@
-## 单个格子节点 - 支持放置区和扫雷区两种模式
+## 单个格子节点 - 支持放置区和探索区两种模式
 
 extends Button
 
@@ -77,6 +77,8 @@ func _update_mark_display():
 		remove_theme_color_override("font_color")
 		add_theme_font_size_override("font_size", 20)
 
+var _hp_ratio: float = -1.0  # -1 = 不显示HP条
+
 func set_display_state(state: DisplayState, extra: Dictionary = {}):
 	_current_state = state
 	_marked_safe = false  # 翻开/状态变化时清除标记
@@ -124,6 +126,11 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 				DisplayState.BOSS_ABSORB: border_col = Color(0.20, 0.75, 0.35); border_w = 2
 			_apply_style(Color(0,0,0,0), border_col, border_w)
 			_show_boss_info(extra)
+			# HP 比率（用于底部血条）
+			var hp = extra.get("hp", -1)
+			var max_hp = extra.get("max_hp", 1)
+			_hp_ratio = float(hp) / max(max_hp, 1) if hp >= 0 else -1.0
+			queue_redraw()
 
 		DisplayState.BOSS_DEAD:
 			var local = extra.get("local_pos", Vector2i(0, 0))
@@ -131,6 +138,8 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			expand_icon = true
 			_apply_style(C_BOSS_DEAD, Color(0.25, 0.22, 0.22), 1)
 			modulate = Color(0.35, 0.3, 0.3, 0.5)
+			_hp_ratio = -1.0
+			queue_redraw()
 
 		DisplayState.EXPLODING:
 			_apply_style(C_EXPLODING, Color(1.0, 0.65, 0.0), 3)
@@ -175,6 +184,28 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 				disabled = true
 
 	modulate = Color.WHITE
+	if _hp_ratio < 0.0:
+		queue_redraw()
+
+func _draw():
+	if _hp_ratio < 0.0 or _hp_ratio > 1.0:
+		return
+	# 底部 5px HP 条
+	var bar_h = max(5, cell_size / 12)
+	var bar_y = cell_size - bar_h
+	# 背景
+	draw_rect(Rect2(1, bar_y, cell_size - 2, bar_h), Color(0.05, 0.05, 0.05, 0.85))
+	# 前景
+	var bar_col: Color
+	if _hp_ratio > 0.6:
+		bar_col = Color(0.25, 0.85, 0.3)
+	elif _hp_ratio > 0.3:
+		bar_col = Color(0.95, 0.75, 0.1)
+	else:
+		bar_col = Color(0.90, 0.15, 0.1)
+	var fill_w = int((cell_size - 2) * _hp_ratio)
+	if fill_w > 0:
+		draw_rect(Rect2(1, bar_y, fill_w, bar_h), bar_col)
 
 func _get_bomb_texture(bomb_type: String) -> Texture2D:
 	if bomb_type in _bomb_textures:
@@ -276,6 +307,17 @@ func animate_boss_pulse():
 	var tween = create_tween()
 	tween.tween_property(self, "modulate", Color(1.3, 1.1, 1.0), 0.05)
 	tween.tween_property(self, "modulate", Color.WHITE, 0.25)
+
+func animate_chain():
+	# 连锁炸弹蓝色脉冲（表示被连锁引爆）
+	pivot_offset = size / 2
+	var tween = create_tween().set_parallel(true)
+	tween.tween_property(self, "modulate", Color(0.5, 0.8, 2.5), 0.08)
+	tween.tween_property(self, "scale", Vector2(1.25, 1.25), 0.08)
+	var tw2 = create_tween().set_parallel(true)
+	tw2.tween_interval(0.08)
+	tw2.tween_property(self, "modulate", Color.WHITE, 0.35)
+	tw2.tween_property(self, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _apply_style(bg: Color, border: Color, border_w: int):
 	var s = StyleBoxFlat.new()

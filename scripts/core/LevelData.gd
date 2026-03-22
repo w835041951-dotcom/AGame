@@ -1,6 +1,6 @@
 ## 关卡数据 - AutoLoad
 ## 5个主题关卡循环，随周期递增难度
-## 每层独立的Boss形状、棋盘大小、扫雷大小
+## 每层独立的Boss形状、棋盘大小、探索区大小
 
 extends Node
 
@@ -56,7 +56,7 @@ const LEVELS = [
 		"subtitle": "冰冷的石墙间回荡着低沉的呻吟…",
 		"color": Color(0.6, 0.65, 0.7),
 		"tile_weights": { "WEAK": 0.30, "ARMOR": 0.10, "ABSORB": 0.05, "NORMAL": 0.55 },
-		"bomb_count": 6,
+		"bomb_count": 9,
 		"turn_duration": 45.0,
 		"boss_attack": 4,
 		"boss_move_interval": 60.0,
@@ -71,7 +71,7 @@ const LEVELS = [
 		"subtitle": "影子在摇曳的火光中扭曲蠕动…",
 		"color": Color(0.5, 0.35, 0.65),
 		"tile_weights": { "WEAK": 0.20, "ARMOR": 0.20, "ABSORB": 0.10, "NORMAL": 0.50 },
-		"bomb_count": 8,
+		"bomb_count": 11,
 		"turn_duration": 40.0,
 		"boss_attack": 5,
 		"boss_move_interval": 55.0,
@@ -85,9 +85,9 @@ const LEVELS = [
 		"boss_name": "熔岩巨蛇",
 		"subtitle": "脚下的岩浆发出炙热的光芒…",
 		"color": Color(0.95, 0.45, 0.15),
-		"tile_weights": { "WEAK": 0.15, "ARMOR": 0.20, "ABSORB": 0.20, "NORMAL": 0.45 },
-		"bomb_count": 9,
-		"turn_duration": 35.0,
+		"tile_weights": { "WEAK": 0.15, "ARMOR": 0.20, "ABSORB": 0.15, "NORMAL": 0.50 },
+		"bomb_count": 12,
+		"turn_duration": 36.0,
 		"boss_attack": 6,
 		"boss_move_interval": 50.0,
 		"placement_cols": 12, "placement_rows": 7,
@@ -100,9 +100,9 @@ const LEVELS = [
 		"boss_name": "骸骨巨人",
 		"subtitle": "堆积如山的白骨中传来咔嚓声…",
 		"color": Color(0.85, 0.82, 0.7),
-		"tile_weights": { "WEAK": 0.10, "ARMOR": 0.35, "ABSORB": 0.15, "NORMAL": 0.40 },
-		"bomb_count": 10,
-		"turn_duration": 32.0,
+		"tile_weights": { "WEAK": 0.10, "ARMOR": 0.35, "ABSORB": 0.12, "NORMAL": 0.43 },
+		"bomb_count": 14,
+		"turn_duration": 36.0,
 		"boss_attack": 7,
 		"boss_move_interval": 45.0,
 		"placement_cols": 13, "placement_rows": 8,
@@ -115,9 +115,9 @@ const LEVELS = [
 		"boss_name": "深渊魔王",
 		"subtitle": "黑暗的尽头，一双猩红的眼睛注视着你…",
 		"color": Color(0.9, 0.12, 0.08),
-		"tile_weights": { "WEAK": 0.08, "ARMOR": 0.30, "ABSORB": 0.22, "NORMAL": 0.40 },
-		"bomb_count": 12,
-		"turn_duration": 28.0,
+		"tile_weights": { "WEAK": 0.08, "ARMOR": 0.30, "ABSORB": 0.15, "NORMAL": 0.47 },
+		"bomb_count": 16,
+		"turn_duration": 32.0,
 		"boss_attack": 9,
 		"boss_move_interval": 40.0,
 		"placement_cols": 14, "placement_rows": 8,
@@ -189,7 +189,7 @@ func get_boss_texture_path(floor_number: int) -> String:
 	var key = get_level(floor_number)["boss_shape"]
 	return BOSS_TEXTURE_MAP[key]
 
-# 根据棋盘大小自动计算格子像素大小，保证放置区+扫雷区不超过可用高度
+# 根据棋盘大小自动计算格子像素大小，保证放置区+探索区不超过可用高度
 func get_cell_size(floor_number: int) -> int:
 	var p_cols = get_placement_cols(floor_number)
 	var p_rows = get_placement_rows(floor_number)
@@ -232,4 +232,4 @@ func get_hp_multiplier(floor_number: int) -> float:
 
 func get_max_clicks(floor_number: int) -> int:
 	var cycle = get_cycle(floor_number)
-	return 5 + floor_number + cycle
+	return 6 + floor_number + cycle * 2

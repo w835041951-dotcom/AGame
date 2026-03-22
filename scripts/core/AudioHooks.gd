@@ -14,7 +14,7 @@ func _ready():
 	BossGrid.tile_destroyed.connect(func(_lp, _part): AudioManager.play_sfx("tile_break"))
 	BossGrid.boss_moved.connect(func(_o): AudioManager.play_sfx("boss_move"))
 
-	# 扫雷区
+	# 探索区
 	GridManager.grid_revealed.connect(func(_x, _y, _d): AudioManager.play_sfx("mine_reveal"))
 	GridManager.bomb_found.connect(func(_x, _y, _t): AudioManager.play_sfx("mine_bomb"))
 

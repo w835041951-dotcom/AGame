@@ -1,7 +1,7 @@
 """
-Boss 像素艺术生成器 v3 — 地牢石像鬼(Gargoyle)风格
-256x192px (4col x 3row, 64px/cell)
-特点：石头质感 + 裂纹 + 发光符文 + 蝙蝠翼 — 经典地牢像素风
+Boss 像素艺术生成器 v4 — 每种Boss独立纹理
+按形状大小生成：石像鬼3x3, 影蛛5x3, 熔岩巨蛇4x4, 骸骨巨人5x5, 深渊魔王6x4
+每个Boss一张atlas贴图，Cell.gd按local坐标裁切
 """
 import os, math, random
 from PIL import Image, ImageDraw, ImageFilter
@@ -10,10 +10,70 @@ OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites", "
 os.makedirs(OUT, exist_ok=True)
 
 SCALE = 6
-W, H = 256 * SCALE, 192 * SCALE
-CELL = 64 * SCALE
+CELL_PX = 64  # 每格最终像素
 
-random.seed(42)  # 可复现
+random.seed(42)
+
+# ── 5种Boss的配色方案 ──
+BOSS_CONFIGS = {
+    "gargoyle": {
+        "cols": 3, "rows": 3,
+        "shape": [(0,0),(1,0),(2,0),(0,1),(1,1),(2,1),(0,2),(1,2),(2,2)],
+        "body":  (72, 78, 85),    # 灰石色
+        "dark":  (35, 38, 42),
+        "crack": (40, 42, 48),
+        "glow":  (60, 255, 120),  # 绿色灵光
+        "eye":   (80, 255, 130),
+        "rune":  (60, 220, 100),
+        "accent":(50, 180, 80),
+    },
+    "spider": {
+        "cols": 5, "rows": 3,
+        "shape": [(1,0),(2,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),(1,2),(2,2),(3,2)],
+        "body":  (60, 45, 75),    # 暗紫色
+        "dark":  (30, 22, 40),
+        "crack": (40, 30, 50),
+        "glow":  (180, 60, 255),  # 紫色毒光
+        "eye":   (220, 50, 255),
+        "rune":  (160, 40, 220),
+        "accent":(120, 30, 180),
+    },
+    "serpent": {
+        "cols": 4, "rows": 4,
+        "shape": [(0,0),(1,0),(2,0),(3,0),(3,1),(0,2),(1,2),(2,2),(3,2),(0,3)],
+        "body":  (95, 55, 30),    # 熔岩橙棕
+        "dark":  (50, 25, 12),
+        "crack": (60, 30, 15),
+        "glow":  (255, 120, 20),  # 熔岩橙
+        "eye":   (255, 160, 40),
+        "rune":  (255, 100, 10),
+        "accent":(200, 80, 10),
+    },
+    "giant": {
+        "cols": 5, "rows": 5,
+        "shape": [(1,0),(2,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),(1,2),(2,2),(3,2),
+                  (0,3),(1,3),(2,3),(3,3),(4,3),(1,4),(2,4),(3,4)],
+        "body":  (85, 82, 70),    # 骨白色
+        "dark":  (42, 40, 35),
+        "crack": (50, 48, 42),
+        "glow":  (220, 200, 120), # 骨黄光
+        "eye":   (240, 220, 140),
+        "rune":  (200, 180, 100),
+        "accent":(160, 140, 80),
+    },
+    "demon": {
+        "cols": 6, "rows": 4,
+        "shape": [(0,0),(1,0),(4,0),(5,0),(0,1),(1,1),(2,1),(3,1),(4,1),(5,1),
+                  (0,2),(1,2),(2,2),(3,2),(4,2),(5,2),(1,3),(2,3),(3,3),(4,3)],
+        "body":  (80, 25, 20),    # 深渊暗红
+        "dark":  (40, 10, 8),
+        "crack": (50, 15, 12),
+        "glow":  (255, 40, 30),   # 血红光
+        "eye":   (255, 60, 40),
+        "rune":  (220, 30, 20),
+        "accent":(180, 20, 15),
+    },
+}
 
 def px(v):
     if isinstance(v, (list, tuple)) and len(v) > 0 and not isinstance(v[0], (int, float)):
@@ -48,7 +108,6 @@ def add_glow(img, cx, cy, r, color, steps=12):
     return Image.alpha_composite(img, glow)
 
 def stone_noise(dr, x0, y0, x1, y1, base_color, density=0.3):
-    """在区域上绘制像素化石头噪点纹理"""
     for y in range(y0, y1, px(2)):
         for x in range(x0, x1, px(2)):
             if random.random() < density:
@@ -56,190 +115,225 @@ def stone_noise(dr, x0, y0, x1, y1, base_color, density=0.3):
                 c = tuple(max(0, min(255, base_color[i] + shade)) for i in range(3))
                 dr.rectangle([x, y, x + px(2), y + px(2)], fill=c + (60,))
 
-def gen_boss():
+def gen_boss_sheet(name, cfg):
+    """生成单个Boss的atlas贴图"""
+    cols, rows = cfg["cols"], cfg["rows"]
+    shape = set(cfg["shape"])
+    W = cols * CELL_PX * SCALE
+    H = rows * CELL_PX * SCALE
+    final_w = cols * CELL_PX
+    final_h = rows * CELL_PX
+
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     dr = ImageDraw.Draw(img)
 
-    # ── 石体底色：深灰-岩绿渐变 ──
-    for y in range(H):
-        t = y / H
-        r = int(50 + 20 * t)
-        g = int(55 + 15 * t)
-        b = int(60 - 10 * t)
-        dr.line([(px(6), y), (W - px(6), y)], fill=(r, g, b, 240))
+    body = cfg["body"]
+    dark = cfg["dark"]
+    crack_c = cfg["crack"]
+    glow_c = cfg["glow"]
+    eye_c = cfg["eye"]
+    rune_c = cfg["rune"]
+    accent = cfg["accent"]
 
-    # ── 石像主体（多层岩石质感） ──
-    rect(dr, 8, 10, 248, 182, fill=(35, 38, 42, 200), radius=12)
-    rect(dr, 5, 7, 251, 185, fill=(60, 65, 72, 255), radius=10)
-    rect(dr, 10, 12, 246, 180, fill=(72, 78, 85, 255), radius=8)
+    cell = CELL_PX  # 64
 
-    # 岩石表面噪点
-    stone_noise(dr, px(10), px(12), px(246), px(180), (72, 78, 85))
+    # ── 填充每个形状格子 ──
+    for (cx, cy) in shape:
+        x0 = cx * cell
+        y0 = cy * cell
+        x1 = x0 + cell
+        y1 = y0 + cell
+        # 深色底
+        rect(dr, x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill=dark + (255,), radius=4)
+        # 主体填色
+        rect(dr, x0 + 3, y0 + 3, x1 - 3, y1 - 3, fill=body + (255,), radius=3)
+        # 石头噪点
+        stone_noise(dr, px(x0 + 3), px(y0 + 3), px(x1 - 3), px(y1 - 3), body, 0.25)
 
-    # ── 岩石裂纹纹路 ──
-    cracks = [
-        [(22, 34), (46, 52), (64, 48), (82, 58)],
-        [(168, 28), (186, 44), (204, 40), (224, 52)],
-        [(28, 110), (52, 122), (72, 116), (96, 128)],
-        [(158, 122), (182, 132), (200, 124), (232, 136)],
-        [(58, 158), (90, 168), (114, 160)],
-        [(140, 156), (170, 166), (194, 158)],
-    ]
-    for crack in cracks:
-        for i in range(len(crack) - 1):
-            line(dr, crack[i][0], crack[i][1], crack[i + 1][0], crack[i + 1][1],
-                 (40, 42, 48, 180), 2)
-            line(dr, crack[i][0] + 1, crack[i][1] + 1, crack[i + 1][0] + 1, crack[i + 1][1] + 1,
-                 (90, 95, 100, 80), 1)
+    shape_list = list(shape)
+    avg_x = sum(p[0] for p in shape_list) / len(shape_list)
+    avg_y = sum(p[1] for p in shape_list) / len(shape_list)
 
-    # ── 蝙蝠翼（左） ──
-    wing_l = [(8, 24), (0, 12), (0, 178), (8, 168), (34, 140), (30, 90), (36, 52), (34, 34)]
-    poly(dr, wing_l, fill=(40, 44, 50, 255))
-    for i in range(4):
-        yt = 26 + i * 34
-        yb = yt + 32
-        poly(dr, [(8, yt), (30, yt - 4), (32, yb + 4), (8, yb)],
-             fill=(55, 60, 68, 220))
-        line(dr, 9, yt + 2, 28, yt - 2, (80, 85, 95, 160), 1)
-    # 蝙蝠翼（右，镜像）
-    wing_r = [(248, 24), (256, 12), (256, 178), (248, 168), (222, 140), (226, 90), (220, 52), (222, 34)]
-    poly(dr, wing_r, fill=(40, 44, 50, 255))
-    for i in range(4):
-        yt = 26 + i * 34
-        yb = yt + 32
-        poly(dr, [(248, yt), (226, yt - 4), (224, yb + 4), (248, yb)],
-             fill=(55, 60, 68, 220))
-        line(dr, 247, yt + 2, 228, yt - 2, (80, 85, 95, 160), 1)
-
-    # ── 石角（弯曲羊角造型） ──
-    for t in range(8):
-        frac = t / 7
-        ax = 58 + int(18 * frac)
-        ay = 12 - int(22 * math.sin(frac * math.pi * 0.6))
-        r_size = 12 - int(8 * frac)
-        shade = int(90 + 40 * frac)
-        circle(dr, ax, ay, r_size, (shade, shade - 5, shade - 10, 255))
-    for t in range(8):
-        frac = t / 7
-        ax = 198 - int(18 * frac)
-        ay = 12 - int(22 * math.sin(frac * math.pi * 0.6))
-        r_size = 12 - int(8 * frac)
-        shade = int(90 + 40 * frac)
-        circle(dr, ax, ay, r_size, (shade, shade - 5, shade - 10, 255))
-
-    # ── 面部 ──
-    rect(dr, 62, 4, 194, 62, fill=(58, 62, 70, 255), radius=14)
-    rect(dr, 66, 8, 190, 60, fill=(70, 75, 82, 255), radius=12)
-    stone_noise(dr, px(66), px(8), px(190), px(60), (70, 75, 82), 0.2)
-
-    # 眉脊
-    poly(dr, [(70, 22), (94, 14), (102, 22), (94, 26), (70, 28)], fill=(50, 54, 60, 255))
-    poly(dr, [(186, 22), (162, 14), (154, 22), (162, 26), (186, 28)], fill=(50, 54, 60, 255))
-
-    # 眼窝（深凹）
-    poly(dr, [(74, 22), (100, 20), (102, 37), (74, 39)], fill=(10, 12, 15, 255))
-    poly(dr, [(154, 20), (180, 22), (180, 39), (152, 37)], fill=(10, 12, 15, 255))
-
-    # 眼睛发光（绿色地牢灵光）
-    img = add_glow(img, px(88), px(30), px(14), (60, 255, 120, 140))
-    img = add_glow(img, px(168), px(30), px(14), (60, 255, 120, 140))
+    # ── 中心符文（画在身体中部，避开脸部） ──
+    min_y = min(p[1] for p in shape_list)
+    # 中心符文选在avg_y之下的格子
+    body_cells = [p for p in shape_list if p[1] > min_y + 1]
+    if not body_cells:
+        body_cells = [p for p in shape_list if p[1] > min_y]
+    if not body_cells:
+        body_cells = shape_list
+    center_cell = min(body_cells, key=lambda p: (p[0]+0.5-avg_x)**2 + (p[1]+0.5-avg_y)**2)
+    rcx = (center_cell[0] + 0.5) * cell
+    rcy = (center_cell[1] + 0.5) * cell
+    rr = 18
+    for i in range(6):
+        a1 = math.radians(60 * i - 90)
+        a2 = math.radians(60 * (i + 1) - 90)
+        x1r = rcx + rr * math.cos(a1)
+        y1r = rcy + rr * math.sin(a1)
+        x2r = rcx + rr * math.cos(a2)
+        y2r = rcy + rr * math.sin(a2)
+        line(dr, x1r, y1r, x2r, y2r, rune_c + (255,), 2)
+    img = add_glow(img, px(rcx), px(rcy), px(16), glow_c + (100,))
     dr = ImageDraw.Draw(img)
-    circle(dr, 88, 30, 6, (80, 255, 130, 255))
-    circle(dr, 88, 30, 3, (200, 255, 220, 255))
-    circle(dr, 168, 30, 6, (80, 255, 130, 255))
-    circle(dr, 168, 30, 3, (200, 255, 220, 255))
+    circle(dr, rcx, rcy, 6, accent + (255,))
+    circle(dr, rcx - 2, rcy - 2, 2.5, (min(255,accent[0]+80), min(255,accent[1]+80), min(255,accent[2]+80), 200))
 
-    # 鼻部（扁平+两个鼻孔）
-    poly(dr, [(120, 37), (128, 32), (136, 37), (134, 46), (122, 46)], fill=(55, 58, 65, 255))
-    circle(dr, 124, 43, 3, (20, 22, 26, 255))
-    circle(dr, 132, 43, 3, (20, 22, 26, 255))
+    # ── 裂纹 ──
+    random.seed(hash(name))
+    for _ in range(len(shape_list) * 2):
+        cell_pick = random.choice(shape_list)
+        sx = (cell_pick[0] + random.uniform(0.15, 0.85)) * cell
+        sy = (cell_pick[1] + random.uniform(0.15, 0.85)) * cell
+        for seg in range(random.randint(2, 4)):
+            ex = sx + random.uniform(-18, 18)
+            ey = sy + random.uniform(-18, 18)
+            line(dr, sx, sy, ex, ey, crack_c + (180,), 2)
+            line(dr, sx + 0.8, sy + 0.8, ex + 0.8, ey + 0.8, (min(255,crack_c[0]+50), min(255,crack_c[1]+50), min(255,crack_c[2]+50), 60), 1)
+            sx, sy = ex, ey
 
-    # 嘴部（石裂口+尖牙）
-    poly(dr, [(78, 46), (178, 46), (174, 59), (82, 59)], fill=(15, 16, 20, 255))
-    for tx in range(82, 173, 12):
-        poly(dr, [(tx, 46), (tx + 6, 46), (tx + 3, 54)], fill=(190, 195, 180, 255))
-    for tx in range(88, 172, 12):
-        poly(dr, [(tx, 59), (tx + 6, 59), (tx + 3, 52)], fill=(180, 185, 170, 255))
-
-    # ── 胸甲：发光符文圆盘 ──
-    cx, cy = 128, 128
-    circle(dr, cx, cy, 32, (45, 48, 55, 255))
-    circle(dr, cx, cy, 27, (55, 58, 65, 255))
-    stone_noise(dr, px(cx - 27), px(cy - 27), px(cx + 27), px(cy + 27), (55, 58, 65), 0.2)
-
-    rune_pts = [
-        [(cx, cy - 22), (cx + 14, cy - 7), (cx + 10, cy + 12), (cx, cy + 22),
-         (cx - 10, cy + 12), (cx - 14, cy - 7), (cx, cy - 22)],
-        [(cx - 7, cy - 12), (cx + 7, cy - 12)],
-        [(cx - 10, cy + 5), (cx + 10, cy + 5)],
-    ]
-    for rune in rune_pts:
-        for i in range(len(rune) - 1):
-            line(dr, rune[i][0], rune[i][1], rune[i + 1][0], rune[i + 1][1],
-                 (60, 220, 100, 255), 2)
-    img = add_glow(img, px(cx), px(cy), px(22), (40, 255, 100, 130))
-    img = add_glow(img, px(cx), px(cy), px(12), (120, 255, 160, 100))
-    dr = ImageDraw.Draw(img)
-    gem = [(cx, cy - 12), (cx + 8, cy - 6), (cx + 8, cy + 6), (cx, cy + 12),
-           (cx - 8, cy + 6), (cx - 8, cy - 6)]
-    poly(dr, gem, fill=(30, 180, 80, 255))
-    poly(dr, [(cx, cy - 12), (cx + 8, cy - 6), (cx + 2, cy)], fill=(60, 230, 120, 220))
-    poly(dr, [(cx, cy - 12), (cx - 8, cy - 6), (cx - 2, cy)], fill=(20, 140, 60, 200))
-    circle(dr, cx - 2, cy - 7, 2.5, (180, 255, 200, 200))
-
-    # ── 腹部石砖分节 ──
-    for seg_y in [70, 86, 100, 114]:
-        line(dr, 42, seg_y, 214, seg_y, (48, 50, 56, 180), 2)
-        line(dr, 42, seg_y + 1, 214, seg_y + 1, (85, 90, 95, 60), 1)
-        for sx in [60, 94, 128, 162, 196]:
-            circle(dr, sx, seg_y, 2.5, (90, 95, 100, 150))
-
-    # ── 石质手臂刻痕 ──
-    for side, xb in [(-1, 42), (1, 214)]:
-        for ay in range(72, 178, 17):
-            line(dr, xb, ay, xb + side * 8, ay + 7, (55, 58, 65, 150), 2)
-            line(dr, xb, ay + 1, xb + side * 8, ay + 8, (90, 95, 100, 60), 1)
-
-    # ── 底部石爪 ──
-    for cx2 in [56, 92, 128, 164, 200]:
-        poly(dr, [(cx2 - 11, 174), (cx2, 168), (cx2 + 11, 174), (cx2 + 6, 192), (cx2 - 6, 192)],
-             fill=(50, 54, 60, 255))
-        poly(dr, [(cx2 - 7, 174), (cx2, 170), (cx2 + 7, 174), (cx2 + 4, 188), (cx2 - 4, 188)],
-             fill=(68, 72, 80, 255))
-        line(dr, cx2 - 7, 174, cx2 - 4, 188, (95, 100, 108, 180), 1)
-
-    # ── 两侧符文标记（绿色小符号） ──
-    for rx, ry in [(26, 78), (26, 134), (230, 78), (230, 134)]:
-        circle(dr, rx, ry, 5, (40, 180, 80, 120))
-        img = add_glow(img, px(rx), px(ry), px(7), (40, 220, 80, 60))
+    # ── 边缘符文小点 ──
+    edge_cells = []
+    for p in shape_list:
+        neighbors = [(p[0]+dx, p[1]+dy) for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]]
+        if any(n not in shape for n in neighbors):
+            edge_cells.append(p)
+    for ec in edge_cells[::2]:
+        rx = (ec[0] + 0.5) * cell
+        ry = (ec[1] + 0.5) * cell
+        circle(dr, rx, ry, 4, glow_c[:3] + (80,))
+        img = add_glow(img, px(rx), px(ry), px(6), glow_c + (40,))
         dr = ImageDraw.Draw(img)
 
-    # ── 外轮廓描边 ──
-    rect(dr, 4, 6, 252, 186, outline=(70, 200, 110, 180), ow=2, radius=10)
-    rect(dr, 6, 8, 250, 184, outline=(50, 55, 62, 120), ow=1, radius=8)
+    # ── 脸部（最后画，覆盖裂纹） ──
+    img = _draw_face(img, cfg, shape, shape_list, avg_x, avg_y, cell)
+    dr = ImageDraw.Draw(img)
+
+    # ── 轮廓描边 ──
+    for (cx2, cy2) in shape:
+        x0 = cx2 * cell
+        y0 = cy2 * cell
+        x1 = x0 + cell
+        y1 = y0 + cell
+        rect(dr, x0 + 1, y0 + 1, x1 - 1, y1 - 1, outline=glow_c[:3] + (100,), ow=1, radius=4)
 
     # ── 缩小到最终尺寸 ──
-    out_img = img.resize((256, 192), Image.LANCZOS)
-
-    # ── 轻微格线（调试参考）──
+    out_img = img.resize((final_w, final_h), Image.LANCZOS)
     gdr = ImageDraw.Draw(out_img)
-    for col in range(1, 4):
-        gdr.line([(col * 64, 0), (col * 64, 192)], fill=(60, 180, 100, 30), width=1)
-    for row in range(1, 3):
-        gdr.line([(0, row * 64), (256, row * 64)], fill=(60, 180, 100, 30), width=1)
+    for col in range(1, cols):
+        gdr.line([(col * CELL_PX, 0), (col * CELL_PX, final_h)], fill=glow_c[:3] + (25,), width=1)
+    for row in range(1, rows):
+        gdr.line([(0, row * CELL_PX), (final_w, row * CELL_PX)], fill=glow_c[:3] + (25,), width=1)
 
-    path = os.path.join(OUT, "boss_full.png")
+    path = os.path.join(OUT, f"boss_{name}.png")
     out_img.save(path)
-    print("saved", path)
+    print(f"saved boss_{name}.png  ({final_w}x{final_h})")
 
-    # ── 受击叠加层（绿色闪光） ──
-    hit = Image.new("RGBA", (256, 192), (0, 0, 0, 0))
+
+def _draw_face(img, cfg, shape, shape_list, avg_x, avg_y, cell):
+    """在Boss贴图上画眼睛+嘴巴，返回新img（因为add_glow创建新Image）"""
+    dr = ImageDraw.Draw(img)
+    glow_c = cfg["glow"]
+    eye_c = cfg["eye"]
+    body = cfg["body"]
+
+    min_y = min(p[1] for p in shape_list)
+    top_row = sorted([p for p in shape_list if p[1] == min_y], key=lambda p: p[0])
+
+    # ── 选眼睛位置：取上排靠中心的两格 ──
+    if len(top_row) >= 3:
+        mid = len(top_row) // 2
+        eye_left = top_row[mid - 1]
+        eye_right = top_row[mid + 1] if mid + 1 < len(top_row) else top_row[mid]
+    elif len(top_row) >= 2:
+        eye_left = top_row[0]
+        eye_right = top_row[-1]
+    else:
+        eye_left = top_row[0]
+        eye_right = top_row[0]
+
+    # ── 画两只眼睛 ──
+    for ec in [eye_left, eye_right]:
+        ex = (ec[0] + 0.5) * cell
+        ey = (ec[1] + 0.35) * cell
+        # 眼窝背景（覆盖裂纹）
+        bg_c = tuple(max(0, c - 15) for c in body)
+        rect(dr, ex - 18, ey - 13, ex + 18, ey + 13, fill=bg_c + (255,), radius=10)
+        # 眼窝深凹
+        rect(dr, ex - 15, ey - 10, ex + 15, ey + 10, fill=(8, 8, 12, 255), radius=8)
+        # 发光
+        img = add_glow(img, px(ex), px(ey), px(14), glow_c + (160,))
+        dr = ImageDraw.Draw(img)
+        # 眼球
+        circle(dr, ex, ey, 9, eye_c + (255,))
+        # 内瞳
+        bright = (min(255, eye_c[0]+100), min(255, eye_c[1]+100), min(255, eye_c[2]+100))
+        circle(dr, ex, ey, 5, bright + (255,))
+        # 高光点
+        circle(dr, ex - 3, ey - 3, 2.5, (255, 255, 255, 220))
+
+    # ── 选嘴巴位置：眼睛下方一行 ──
+    mouth_y = min_y + 1
+    mouth_row = sorted([p for p in shape_list if p[1] == mouth_y], key=lambda p: p[0])
+    if not mouth_row:
+        mouth_row = top_row
+        mouth_y = min_y
+        mouth_vert_offset = 0.78
+    else:
+        mouth_vert_offset = 0.35
+
+    # 嘴巴横跨中间1~3格
+    mid = len(mouth_row) // 2
+    m_start = max(0, mid - 1)
+    m_end = min(len(mouth_row), mid + 2)
+    mouth_cells = mouth_row[m_start:m_end]
+
+    if mouth_cells:
+        mx_left = (mouth_cells[0][0] + 0.12) * cell
+        mx_right = (mouth_cells[-1][0] + 0.88) * cell
+        my = (mouth_cells[0][1] + mouth_vert_offset) * cell
+        mouth_h = 16
+
+        # 嘴巴背景（覆盖裂纹）
+        bg_c = tuple(max(0, c - 15) for c in body)
+        rect(dr, mx_left - 3, my - mouth_h * 0.5 - 3, mx_right + 3, my + mouth_h * 0.5 + 3,
+             fill=bg_c + (255,), radius=4)
+        # 嘴巴黑洞
+        rect(dr, mx_left, my - mouth_h * 0.5, mx_right, my + mouth_h * 0.5,
+             fill=(12, 8, 14, 255), radius=4)
+        # 深红内腔
+        rect(dr, mx_left + 4, my - mouth_h * 0.3, mx_right - 4, my + mouth_h * 0.3,
+             fill=(60, 10, 10, 200), radius=2)
+
+        # 上排尖牙
+        tooth_w = 10
+        n_teeth = max(3, int((mx_right - mx_left) / (tooth_w + 3)))
+        spacing = (mx_right - mx_left) / n_teeth
+        for i in range(n_teeth):
+            tx = mx_left + i * spacing + spacing * 0.15
+            poly(dr, [(tx, my - mouth_h * 0.5),
+                      (tx + tooth_w * 0.5, my - mouth_h * 0.5 + 10),
+                      (tx + tooth_w, my - mouth_h * 0.5)],
+                 fill=(210, 210, 195, 255))
+            poly(dr, [(tx + spacing * 0.08, my + mouth_h * 0.5),
+                      (tx + tooth_w * 0.5, my + mouth_h * 0.5 - 8),
+                      (tx + tooth_w - spacing * 0.08, my + mouth_h * 0.5)],
+                 fill=(190, 190, 175, 255))
+
+    return img
+
+def gen_boss():
+    """生成所有Boss贴图"""
+    for name, cfg in BOSS_CONFIGS.items():
+        gen_boss_sheet(name, cfg)
+    # 通用受击叠加层（取最大尺寸）
+    max_w = max(c["cols"] for c in BOSS_CONFIGS.values()) * CELL_PX
+    max_h = max(c["rows"] for c in BOSS_CONFIGS.values()) * CELL_PX
+    hit = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
     hdr = ImageDraw.Draw(hit)
-    hdr.rounded_rectangle([2, 4, 254, 188], radius=10, fill=(80, 255, 120, 90))
+    hdr.rounded_rectangle([2, 2, max_w-2, max_h-2], radius=10, fill=(255, 255, 255, 70))
     hit.save(os.path.join(OUT, "boss_hit_overlay.png"))
     print("saved boss_hit_overlay.png")
-
-
 def gen_bombs():
     """地牢像素风炸弹图标 32x32 — 圆形炸弹+不同符文标记"""
     bdir = os.path.join(OUT, "..", "bombs")

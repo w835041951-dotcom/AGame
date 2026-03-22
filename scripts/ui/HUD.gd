@@ -15,15 +15,24 @@ var _prev_player_hp: int = -1
 
 func _ready():
 	# 地牢风格 HUD
-	floor_label.add_theme_font_size_override("font_size", 18)
+	floor_label.add_theme_font_size_override("font_size", 20)
 	floor_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.45))
-	timer_label.add_theme_font_size_override("font_size", 22)
+	floor_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	floor_label.add_theme_constant_override("shadow_offset_x", 1)
+	floor_label.add_theme_constant_override("shadow_offset_y", 1)
+	timer_label.add_theme_font_size_override("font_size", 24)
 	timer_label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.82))
-	clicks_label.add_theme_font_size_override("font_size", 16)
+	timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	timer_label.add_theme_constant_override("shadow_offset_x", 1)
+	timer_label.add_theme_constant_override("shadow_offset_y", 1)
+	clicks_label.add_theme_font_size_override("font_size", 17)
 	clicks_label.add_theme_color_override("font_color", Color(0.72, 0.68, 0.58))
-	player_hp_label.add_theme_font_size_override("font_size", 17)
+	player_hp_label.add_theme_font_size_override("font_size", 19)
 	player_hp_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.35))
-	boss_hp_label.add_theme_font_size_override("font_size", 15)
+	player_hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	player_hp_label.add_theme_constant_override("shadow_offset_x", 1)
+	player_hp_label.add_theme_constant_override("shadow_offset_y", 1)
+	boss_hp_label.add_theme_font_size_override("font_size", 16)
 	boss_hp_label.add_theme_color_override("font_color", Color(0.90, 0.85, 0.75))
 	_style_boss_bar()
 
@@ -40,8 +49,8 @@ func _style_boss_bar():
 	boss_hp_bar.add_theme_stylebox_override("fill", fill)
 
 func _process(delta):
-	floor_label.text     = "第 %d 层" % GameManager.floor_number
-	clicks_label.text    = "扫雷: %d" % GameManager.current_clicks
+	floor_label.text     = "🏰 第 %d 层" % GameManager.floor_number
+	clicks_label.text    = "👆 探索: %d" % GameManager.current_clicks
 
 	# Boss HP 平滑过渡
 	boss_hp_bar.max_value = max(GameManager.boss_max_hp, 1)
@@ -50,7 +59,7 @@ func _process(delta):
 	boss_hp_label.text   = "Boss: %d/%d" % [GameManager.boss_hp, GameManager.boss_max_hp]
 
 	# 玩家 HP 受伤闪红
-	player_hp_label.text = "HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]
+	player_hp_label.text = "❤ HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]
 	if _prev_player_hp >= 0 and GameManager.player_hp < _prev_player_hp:
 		_flash_hp_label()
 	_prev_player_hp = GameManager.player_hp

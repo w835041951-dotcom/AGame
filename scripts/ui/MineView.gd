@@ -1,4 +1,4 @@
-## 扫雷区视图 - 下区
+## 探索区视图 - 下区
 
 extends Control
 
@@ -28,7 +28,7 @@ func _on_turn_started():
 		if UpgradeManager.is_reveal_bombs():
 			_reveal_all_bombs()
 	else:
-		# 扫雷图已存在，保留格子对象（右键标记保留），只重置可点击性
+		# 探索图已存在，保留格子对象（右键标记保留），只重置可点击性
 		_restore_clickable()
 		if UpgradeManager.is_reveal_bombs():
 			_reveal_all_bombs()

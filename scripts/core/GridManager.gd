@@ -1,6 +1,6 @@
-## 扫雷区逻辑 - AutoLoad
+## 探索区逻辑 - AutoLoad
 ## 翻到炸弹 = 加入库存，不再直接触发攻击
-## 每层只生成一次扫雷图，多回合共享同一张图
+## 每层只生成一次探索图，多回合共享同一张图
 
 extends Node
 
@@ -23,7 +23,7 @@ func generate_grid():
 		return
 	_grid_generated = true
 
-	# 从 LevelData 读取当前层的扫雷大小
+	# 从 LevelData 读取当前层的探索区大小
 	var floor_n = GameManager.floor_number
 	cols = LevelData.get_mine_cols(floor_n)
 	rows = LevelData.get_mine_rows(floor_n)

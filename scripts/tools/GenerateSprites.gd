@@ -22,11 +22,11 @@ func _run():
 # ---- 炸弹图标 32x32 ----
 func _gen_bombs(dir: String):
 	var defs = {
-		"cross":   [Color(0.9, 0.15, 0.15), "+"],
-		"scatter": [Color(1.0, 0.55, 0.05), "*"],
-		"bounce":  [Color(0.1, 0.85, 0.85), "~"],
-		"pierce":  [Color(1.0, 0.95, 0.1),  "|"],
-		"area":    [Color(0.7, 0.1, 0.9),   "#"],
+		"pierce_h": [Color(1.0, 0.95, 0.1),  "↔"],
+		"pierce_v": [Color(0.7, 0.95, 0.1),  "↕"],
+		"cross":    [Color(0.9, 0.15, 0.15), "+"],
+		"x_shot":   [Color(1.0, 0.55, 0.05), "╳"],
+		"bounce":   [Color(0.1, 0.85, 0.85), "~"],
 	}
 	for bomb_type in defs:
 		var col: Color = defs[bomb_type][0]

@@ -131,9 +131,9 @@ func apply_damage_to_tile(world_pos: Vector2i, amount: int):
 
 	match tile["type"]:
 		TileType.ABSORB:
-			# 吸收格：回血，不受伤
-			GameManager.boss_hp = min(GameManager.boss_hp + 5, GameManager.boss_max_hp)
-			return
+			# 吸收格：回血3点，但仍受25%伤害
+			GameManager.boss_hp = min(GameManager.boss_hp + 3, GameManager.boss_max_hp)
+			amount = int(amount * 0.25)
 		TileType.ARMOR:
 			amount = int(amount * 0.5)
 		TileType.WEAK:
@@ -154,18 +154,45 @@ func _on_tile_destroyed(local_pos: Vector2i, tile: Dictionary):
 		BodyPart.CORE:
 			core_destroyed.emit()
 
-signal boss_attacked  # Boss走出左边界，攻击玩家
+enum AttackType { NORMAL, CHARGE, SLAM, WIDE_SWIPE }
+
+signal boss_attacked(attack_type: AttackType)  # Boss走出左边界，攻击玩家
 
 func move_left():
 	# Boss每回合向左移动一格；到左边界后停住并每回合持续扣血
 	if boss_origin.x > 0:
 		boss_origin.x -= 1
 	else:
-		boss_attacked.emit()
+		var atk = _choose_attack()
+		boss_attacked.emit(atk)
 	boss_moved.emit(boss_origin)
 
 func random_move():
-	move_left()
+	# 高层有概率触发特殊移动
+	var floor_n = GameManager.floor_number
+	var charge_chance = min(0.05 * floor_n, 0.35)  # 每层+5%，最高35%
+	if boss_origin.x > 1 and randf() < charge_chance:
+		# 突进：移动2格
+		boss_origin.x -= 2
+		boss_moved.emit(boss_origin)
+		# 突进后如果到了边界就立即攻击
+		if boss_origin.x <= 0:
+			boss_origin.x = 0
+			boss_attacked.emit(AttackType.CHARGE)
+	else:
+		move_left()
+
+func _choose_attack() -> AttackType:
+	var floor_n = GameManager.floor_number
+	# 高层Boss有更强攻击模式
+	var roll = randf()
+	if floor_n >= 5 and roll < 0.25:
+		return AttackType.WIDE_SWIPE   # 横扫：对玩家造成AOE伤害
+	elif floor_n >= 3 and roll < 0.45:
+		return AttackType.SLAM         # 重击：造成双倍伤害
+	elif floor_n >= 2 and roll < 0.60:
+		return AttackType.CHARGE       # 突进：造成1.5x伤害
+	return AttackType.NORMAL
 
 func _random_type() -> TileType:
 	var weights = LevelData.get_tile_weights(GameManager.floor_number)

@@ -7,6 +7,7 @@ const Cell = preload("res://scripts/ui/Cell.gd")
 var cell_size: int = 64
 
 var cells: Array = []  # cells[y][x]
+var _preview_cells: Array = []  # 当前高亮预览的格子坐标
 
 func _ready():
 	BombPlacer.bomb_placed.connect(_on_bomb_placed)
@@ -16,6 +17,7 @@ func _ready():
 	BossGrid.tile_destroyed.connect(_on_tile_destroyed)
 	GameManager.turn_started.connect(_on_turn_started)
 	ExplosionCalc.explosion_visual.connect(_on_explosion_visual)
+	ExplosionCalc.chain_triggered.connect(_on_chain_triggered)
 
 func _on_turn_started():
 	_build_grid()
@@ -119,3 +121,53 @@ func _on_explosion_visual(bomb_positions: Array, blast_cells: Array):
 			continue
 		if pos.y >= 0 and pos.y < cells.size() and pos.x >= 0 and pos.x < cells[pos.y].size():
 			cells[pos.y][pos.x].animate_explosion_hit(0.05)
+
+func _on_chain_triggered(chained_positions: Array):
+	for pos in chained_positions:
+		if pos.y >= 0 and pos.y < cells.size() and pos.x >= 0 and pos.x < cells[pos.y].size():
+			cells[pos.y][pos.x].animate_chain()
+
+# ---- 炸弹范围预览 ----
+
+func _process(_delta):
+	if BombPlacer.phase != BombPlacer.Phase.PLACING:
+		_clear_preview()
+		return
+	if cells.is_empty():
+		return
+
+	var mouse = get_local_mouse_position()
+	var gx = int(mouse.x / cell_size)
+	var gy = int(mouse.y / cell_size)
+
+	if gx < 0 or gx >= BossGrid.placement_cols or gy < 0 or gy >= BossGrid.placement_rows:
+		_clear_preview()
+		return
+
+	var pos = Vector2i(gx, gy)
+	# 只在可放置的空格/死亡格上显示预览
+	if BossGrid.is_boss_tile(pos) or pos in BombPlacer.placed_bombs:
+		_clear_preview()
+		return
+
+	var blast = ExplosionCalc.get_blast_cells(pos, BombPlacer.selected_type)
+	# 检查预览是否变化
+	if blast == _preview_cells:
+		return
+	_clear_preview()
+	_preview_cells = blast
+	for cell_pos in blast:
+		if cell_pos.y >= 0 and cell_pos.y < cells.size() and cell_pos.x >= 0 and cell_pos.x < cells[cell_pos.y].size():
+			var c = cells[cell_pos.y][cell_pos.x]
+			if c._current_state != Cell.DisplayState.BOMB_PLACED and c._current_state != Cell.DisplayState.EXPLODING:
+				c.modulate = Color(1.3, 1.1, 0.7, 0.85)
+
+func _clear_preview():
+	for cell_pos in _preview_cells:
+		if cell_pos.y >= 0 and cell_pos.y < cells.size() and cell_pos.x >= 0 and cell_pos.x < cells[cell_pos.y].size():
+			var c = cells[cell_pos.y][cell_pos.x]
+			if c._current_state == Cell.DisplayState.BOSS_DEAD:
+				c.modulate = Color(0.35, 0.3, 0.3, 0.5)
+			elif c._current_state != Cell.DisplayState.EXPLODING:
+				c.modulate = Color.WHITE
+	_preview_cells.clear()

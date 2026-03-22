@@ -26,13 +26,13 @@ const BOMB_TYPES = {
 	"x_shot": {
 		"name": "X发射",
 		"description": "对角线四方向发射",
-		"damage": 8,
+		"damage": 10,
 		"color": Color.ORANGE
 	},
 	"bounce": {
 		"name": "反弹",
 		"description": "发射后遇墙反弹",
-		"damage": 8,
+		"damage": 10,
 		"color": Color.CYAN
 	}
 }

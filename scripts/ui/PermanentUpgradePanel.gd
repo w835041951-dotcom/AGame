@@ -10,12 +10,21 @@ func _ready():
 
 func show_choices(upgrades: Array):
 	visible = true
-	title_label.text = "🏆 永久强化"
+	title_label.text = "🏆 炸弹强化"
 	_style_title(title_label, Color(1.0, 0.75, 0.2))
 	for child in choice_container.get_children():
 		child.queue_free()
+	var idx = 0
 	for upgrade in upgrades:
-		choice_container.add_child(_make_card(upgrade))
+		var card = _make_card(upgrade)
+		choice_container.add_child(card)
+		card.modulate = Color(1, 1, 1, 0)
+		card.position.y += 30
+		var tw = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+		tw.tween_interval(idx * 0.12)
+		tw.tween_property(card, "modulate:a", 1.0, 0.3)
+		tw.parallel().tween_property(card, "position:y", card.position.y - 30, 0.3)
+		idx += 1
 
 func _make_card(upgrade: Dictionary) -> Control:
 	var rarity = upgrade.get("rarity", "common")

@@ -18,9 +18,9 @@ var floor_number: int = 1
 var boss_hp: int = 0
 var boss_max_hp: int = 0
 
-# ---- 扫雷点击次数 ----
-var current_clicks: int = 6
-var max_clicks: int = 6
+# ---- 探索次数 ----
+var current_clicks: int = 7
+var max_clicks: int = 7
 
 # ---- 炸弹库存 ----
 var bomb_inventory: Dictionary = {}  # bomb_type -> count
@@ -31,7 +31,7 @@ var turn_duration: float = 45.0
 var timer_running: bool = false
 
 # ---- 临时升级阈值 ----
-var combat_upgrade_thresholds: Array = [75, 50, 25]
+var combat_upgrade_thresholds: Array = [80, 50, 25]
 var triggered_thresholds: Array = []
 
 func _process(delta):
@@ -42,12 +42,6 @@ func _process(delta):
 			timer_running = false  # 先停止，防止重复触发
 			turn_ended.emit()
 
-func start_turn():
-	current_clicks = max_clicks
-	turn_timer = turn_duration
-	timer_running = true
-	turn_started.emit()
-
 func end_turn():
 	# 玩家主动结束回合
 	if not timer_running:
@@ -57,7 +51,7 @@ func end_turn():
 
 signal clicks_exhausted
 
-# ---- 扫雷点击 ----
+# ---- 探索点击 ----
 func use_click() -> bool:
 	if current_clicks <= 0:
 		return false
@@ -82,14 +76,14 @@ func use_bomb(type: String) -> bool:
 	return true
 
 func _check_no_bomb_no_mine():
-	# 如果炸弹用完（含放置区）且扫雷区没有未翻开格，判断为无路可走
+	# 如果炸弹用完（含放置区）且探索区没有未翻开格，判断为无路可走
 	if total_bombs() > 0:
 		return
 	if not BombPlacer.placed_bombs.is_empty():
 		return  # 放置区还有炸弹，可以引爆
 	if not timer_running:
 		return
-	# 检查扫雷区是否还有 HIDDEN 格
+	# 检查探索区是否还有 HIDDEN 格
 	for y in range(GridManager.rows):
 		for x in range(GridManager.cols):
 			var cell = GridManager.get_cell(x, y)
@@ -152,3 +146,16 @@ func init_boss_hp():
 # ---- 玩家回血（升级用）----
 func heal(amount: int):
 	player_hp = min(player_hp + amount, player_max_hp)
+
+# ---- 横扫减益：下回合点击次数-2 ----
+var _swipe_debuff: int = 0
+
+func apply_swipe_debuff():
+	_swipe_debuff += 2
+
+func start_turn():
+	current_clicks = max(1, max_clicks - _swipe_debuff)
+	_swipe_debuff = 0
+	turn_timer = turn_duration
+	timer_running = true
+	turn_started.emit()

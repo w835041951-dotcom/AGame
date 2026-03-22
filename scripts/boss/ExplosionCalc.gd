@@ -3,6 +3,8 @@
 extends Node
 
 signal explosion_visual(bomb_positions: Array, blast_cells: Array)
+signal damage_numbers(cell_damages: Dictionary)  # Vector2i(world) -> int 总伤害
+signal chain_triggered(chained_positions: Array)  # 被连锁引爆的炸弹位置
 
 # ---- 爆炸范围计算 ----
 
@@ -90,6 +92,10 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 		if to_process.is_empty():
 			break
 
+	# 连锁视觉提示
+	if not chained.is_empty():
+		chain_triggered.emit(chained.keys())
+
 	# 步骤2: 构建 hit_map
 	var dmg_mult = UpgradeManager.get_combat_dmg_mult()
 	var hit_map: Dictionary = {}
@@ -117,12 +123,14 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 
 	# 步骤4: 逐格写入伤害（类型修正在 BossGrid 内部处理）
 	var total_damage = 0
+	var cell_damages: Dictionary = {}  # 用于浮动数字
 	for cell in hit_map:
 		var sum = 0.0
 		for v in hit_map[cell]:
 			sum += v
 		var final_dmg = int(sum)
 		total_damage += final_dmg
+		cell_damages[cell] = final_dmg
 		BossGrid.apply_damage_to_tile(cell, final_dmg)
 
 	# 步骤5: 同步总HP + 检查升级阈值
@@ -130,6 +138,44 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 
 	# 爆炸视觉信号（供 PlacementView 播放动画）
 	explosion_visual.emit(placed_bombs.keys(), all_blast_cells)
+	damage_numbers.emit(cell_damages)
 
 	await get_tree().create_timer(0.6).timeout
+
+	# 二次引爆升级：再结算一次相同炸弹图（消耗一次）
+	if UpgradeManager.is_double_detonate():
+		UpgradeManager.consume_double_detonate()
+		var second = await _second_wave(placed_bombs)
+		total_damage += second
+
 	return total_damage
+
+func _second_wave(bombs: Dictionary) -> int:
+	if bombs.is_empty():
+		return 0
+	var dmg_mult = UpgradeManager.get_combat_dmg_mult()
+	var hit_map2: Dictionary = {}
+	var blast_cells2: Array = []
+	for bomb_pos in bombs:
+		var bomb_type = bombs[bomb_pos]
+		var base_dmg = float(BombRegistry.calculate_damage(bomb_type)) * dmg_mult * 0.6  # 二次引爆伤害60%
+		var blast = get_blast_cells(bomb_pos, bomb_type)
+		for cell in blast:
+			if cell not in blast_cells2:
+				blast_cells2.append(cell)
+			if BossGrid.is_boss_tile(cell):
+				if cell not in hit_map2:
+					hit_map2[cell] = []
+				hit_map2[cell].append(base_dmg)
+	explosion_visual.emit(bombs.keys(), blast_cells2)
+	var total2 = 0
+	for cell in hit_map2:
+		var s = 0.0
+		for v in hit_map2[cell]:
+			s += v
+		var fd = int(s)
+		total2 += fd
+		BossGrid.apply_damage_to_tile(cell, fd)
+	GameManager.sync_boss_hp()
+	await get_tree().create_timer(0.5).timeout
+	return total2

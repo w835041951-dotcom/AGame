@@ -10,17 +10,17 @@ const PERMANENT_UPGRADES = [
 	{ "id": "unlock_cross",   "name": "十字炮",   "description": "解锁十字炮炸弹",          "rarity": "rare"   },
 	{ "id": "unlock_x_shot",  "name": "X发射",    "description": "解锁X发射炸弹",            "rarity": "rare"   },
 	{ "id": "unlock_bounce",  "name": "反弹炸弹", "description": "解锁反弹炸弹",            "rarity": "epic"   },
-	{ "id": "chain_boost",    "name": "连锁大师", "description": "连锁加成从30%提升到50%","rarity": "epic"   },
+	{ "id": "chain_boost",    "name": "连锁大师", "description": "连锁加成从30%提升到60%","rarity": "epic"   },
 ]
 
 # ---- 临时升级池（血量阶段奖励 - 棋盘效果） ----
 const COMBAT_UPGRADES = [
-	{ "id": "reveal_bombs",     "name": "全图透视", "description": "扫雷区所有炸弹位置显示",  "rarity": "rare"   },
-	{ "id": "reveal_area",      "name": "局部透视", "description": "随机翻开扫雷区5×5区域",   "rarity": "common" },
+	{ "id": "reveal_bombs",     "name": "全图透视", "description": "探索区所有炸弹位置显示",  "rarity": "rare"   },
+	{ "id": "reveal_area",      "name": "局部透视", "description": "随机翻开探索区5×5区域",   "rarity": "common" },
 	{ "id": "extra_weak",       "name": "暴露弱点", "description": "Boss新增1个弱点格",       "rarity": "rare"   },
 	{ "id": "freeze_boss",      "name": "冻结Boss", "description": "本回合Boss不移动",         "rarity": "rare"   },
 	{ "id": "heal_combat",      "name": "战场急救", "description": "立即回复 8 点HP",         "rarity": "common" },
-	{ "id": "more_clicks",      "name": "额外点击", "description": "本层扫雷点击次数 +2",   "rarity": "common" },
+	{ "id": "more_clicks",      "name": "额外点击", "description": "本层探索次数 +2",   "rarity": "common" },
 	{ "id": "extra_bombs",      "name": "弹药补给", "description": "立即获得2个当前类型炸弹", "rarity": "common" },
 	{ "id": "double_detonate",  "name": "二次引爆", "description": "下次引爆触发两次",         "rarity": "epic"   },
 ]
@@ -57,7 +57,7 @@ func apply_permanent(upgrade: Dictionary):
 		"unlock_bounce":
 			BombRegistry.unlock_type("bounce")
 		"chain_boost":
-			_chain_multiplier_perm = 0.5
+			_chain_multiplier_perm = 0.6
 
 func apply_combat(upgrade: Dictionary):
 	match upgrade["id"]:
