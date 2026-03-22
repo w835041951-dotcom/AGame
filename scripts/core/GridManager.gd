@@ -1,21 +1,21 @@
-## 扫雷格子数据和逻辑
+## 扫雷区逻辑 - AutoLoad
+## 翻到炸弹 = 加入库存，不再直接触发攻击
 
 extends Node
 
 signal grid_revealed(x: int, y: int, cell_data: Dictionary)
-signal bomb_triggered(x: int, y: int, bomb_type: String)
+signal bomb_found(x: int, y: int, bomb_type: String)
 
 const COLS = 10
-const ROWS = 8
-const BOMB_COUNT = 15
+const ROWS = 5
+const BOMB_COUNT = 12
 
-var grid: Array = []  # Array of Dictionaries
+var grid: Array = []
 
-enum CellState { HIDDEN, REVEALED, FLAGGED }
+enum CellState { HIDDEN, REVEALED }
 
 func generate_grid():
 	grid.clear()
-	# 初始化所有格子
 	for y in range(ROWS):
 		var row = []
 		for x in range(COLS):
@@ -44,9 +44,42 @@ func generate_grid():
 	for y in range(ROWS):
 		for x in range(COLS):
 			if not grid[y][x]["is_bomb"]:
-				grid[y][x]["adjacent"] = count_adjacent_bombs(x, y)
+				grid[y][x]["adjacent"] = _count_adjacent(x, y)
 
-func count_adjacent_bombs(x: int, y: int) -> int:
+func reveal_cell(x: int, y: int):
+	var cell = grid[y][x]
+	if cell["state"] != CellState.HIDDEN:
+		return
+	if not GameManager.use_click():
+		return
+	cell["state"] = CellState.REVEALED
+
+	if cell["is_bomb"]:
+		# 找到炸弹 = 加入库存
+		GameManager.add_bomb(cell["bomb_type"])
+		bomb_found.emit(x, y, cell["bomb_type"])
+		grid_revealed.emit(x, y, cell)
+	else:
+		grid_revealed.emit(x, y, cell)
+		if cell["adjacent"] == 0:
+			_auto_reveal(x, y)
+
+func _auto_reveal(x: int, y: int):
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var nx = x + dx
+			var ny = y + dy
+			if nx >= 0 and nx < COLS and ny >= 0 and ny < ROWS:
+				var nb = grid[ny][nx]
+				if nb["state"] == CellState.HIDDEN and not nb["is_bomb"]:
+					nb["state"] = CellState.REVEALED
+					grid_revealed.emit(nx, ny, nb)
+					if nb["adjacent"] == 0:
+						_auto_reveal(nx, ny)
+
+func _count_adjacent(x: int, y: int) -> int:
 	var count = 0
 	for dy in range(-1, 2):
 		for dx in range(-1, 2):
@@ -59,38 +92,7 @@ func count_adjacent_bombs(x: int, y: int) -> int:
 					count += 1
 	return count
 
-func reveal_cell(x: int, y: int):
-	if not GameManager.use_click():
-		return
-
-	var cell = grid[y][x]
-	if cell["state"] != CellState.HIDDEN:
-		return
-
-	cell["state"] = CellState.REVEALED
-
-	if cell["is_bomb"]:
-		bomb_triggered.emit(x, y, cell["bomb_type"])
-	else:
-		grid_revealed.emit(x, y, cell)
-		# 空白格自动翻开周围（不消耗点击次数）
-		if cell["adjacent"] == 0:
-			auto_reveal_adjacent(x, y)
-
-func auto_reveal_adjacent(x: int, y: int):
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
-			if dx == 0 and dy == 0:
-				continue
-			var nx = x + dx
-			var ny = y + dy
-			if nx >= 0 and nx < COLS and ny >= 0 and ny < ROWS:
-				var neighbor = grid[ny][nx]
-				if neighbor["state"] == CellState.HIDDEN and not neighbor["is_bomb"]:
-					neighbor["state"] = CellState.REVEALED
-					grid_revealed.emit(nx, ny, neighbor)
-					if neighbor["adjacent"] == 0:
-						auto_reveal_adjacent(nx, ny)
-
 func get_cell(x: int, y: int) -> Dictionary:
+	if x < 0 or x >= COLS or y < 0 or y >= ROWS:
+		return {}
 	return grid[y][x]

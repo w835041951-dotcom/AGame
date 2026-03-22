@@ -1,45 +1,32 @@
-## HUD — 顶部状态栏：点击次数 + HP
+## HUD - 顶部状态栏
 
 extends Control
 
-@onready var clicks_label: Label = $ClicksLabel
+@onready var timer_label: Label = $TimerLabel
 @onready var player_hp_label: Label = $PlayerHPLabel
 @onready var boss_hp_bar: ProgressBar = $BossHPBar
 @onready var boss_hp_label: Label = $BossHPLabel
 @onready var floor_label: Label = $FloorLabel
-@onready var damage_label: Label = $DamageLabel
+@onready var clicks_label: Label = $ClicksLabel
 
-func _ready():
-	GameManager.turn_started.connect(_on_turn_started)
-	GameManager.boss_defeated.connect(_on_boss_defeated)
-	GameManager.game_over.connect(_on_game_over)
-	BombEffect.attack_dealt.connect(_on_damage_dealt)
-	_refresh()
+var _last_timer_int: int = -1
 
 func _process(_delta):
-	clicks_label.text = "点击: %d / %d" % [GameManager.current_clicks, GameManager.max_clicks]
-	player_hp_label.text = "HP: %d" % GameManager.player_hp
-	boss_hp_bar.max_value = GameManager.boss_max_hp
-	boss_hp_bar.value = GameManager.boss_hp
-	boss_hp_label.text = "Boss HP: %d / %d" % [GameManager.boss_hp, GameManager.boss_max_hp]
-	floor_label.text = "第 %d 层" % GameManager.floor_number
+	floor_label.text     = "第 %d 层" % GameManager.floor_number
+	player_hp_label.text = "HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]
+	clicks_label.text    = "扫雷: %d" % GameManager.current_clicks
+	boss_hp_bar.max_value = max(GameManager.boss_max_hp, 1)
+	boss_hp_bar.value    = GameManager.boss_hp
+	boss_hp_label.text   = "Boss: %d/%d" % [GameManager.boss_hp, GameManager.boss_max_hp]
 
-func _refresh():
-	damage_label.visible = false
+	var t = GameManager.turn_timer
+	timer_label.text = "⏱ %.0f" % t
+	var warn = t < 10.0 and GameManager.timer_running
+	timer_label.add_theme_color_override("font_color",
+		Color(1.0, 0.25, 0.25) if warn else Color(1.0, 1.0, 1.0))
 
-func _on_turn_started(_clicks: int):
-	pass
-
-func _on_damage_dealt(damage: int):
-	damage_label.text = "-%d" % damage
-	damage_label.visible = true
-	var tween = create_tween()
-	tween.tween_property(damage_label, "modulate:a", 0.0, 0.8)
-	tween.tween_callback(func(): damage_label.visible = false; damage_label.modulate.a = 1.0)
-
-func _on_boss_defeated():
-	# 触发升级界面（由Main场景处理）
-	pass
-
-func _on_game_over():
-	pass
+	# 倒计时最后10秒每秒beep
+	var t_int = int(t)
+	if warn and t_int != _last_timer_int:
+		_last_timer_int = t_int
+		AudioManager.play_sfx("timer_warn")

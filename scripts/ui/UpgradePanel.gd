@@ -1,45 +1,48 @@
-## 升级选择面板
+## 升级选择面板 - 支持临时和永久两种模式
 
 extends Control
 
-signal upgrade_chosen(upgrade: Dictionary)
+signal chosen
 
-@onready var choice_container = $ChoiceContainer
-@onready var title_label = $TitleLabel
+@onready var title_label: Label = $TitleLabel
+@onready var choice_container: HBoxContainer = $ChoiceContainer
 
-var choices: Array = []
+var is_permanent: bool = false
 
 func _ready():
-	upgrade_chosen.connect(_on_upgrade_chosen)
+	visible = false
 
-func show_choices(upgrades: Array):
-	choices = upgrades
+func show_choices(upgrades: Array, permanent: bool):
+	is_permanent = permanent
 	visible = true
+	title_label.text = "【永久升级】选择强化" if permanent else "【临时升级】选择增益（本层有效）"
+
 	for child in choice_container.get_children():
 		child.queue_free()
 
 	for upgrade in upgrades:
-		var btn = _make_upgrade_button(upgrade)
+		var btn = _make_btn(upgrade)
 		choice_container.add_child(btn)
 
-func _make_upgrade_button(upgrade: Dictionary) -> Button:
+func _make_btn(upgrade: Dictionary) -> Button:
 	var btn = Button.new()
-	btn.custom_minimum_size = Vector2(280, 100)
-	btn.text = "%s\n%s" % [upgrade["name"], upgrade["description"]]
-	btn.add_theme_font_size_override("font_size", 16)
-
-	var rarity_color = Color.WHITE
+	btn.custom_minimum_size = Vector2(260, 110)
+	btn.text = "%s\n\n%s" % [upgrade["name"], upgrade["description"]]
+	btn.add_theme_font_size_override("font_size", 15)
+	var col = Color.WHITE
 	match upgrade.get("rarity", "common"):
-		"common": rarity_color = Color(0.7, 0.7, 0.7)
-		"rare": rarity_color = Color(0.3, 0.5, 1.0)
-		"epic": rarity_color = Color(0.7, 0.3, 1.0)
-	btn.add_theme_color_override("font_color", rarity_color)
-
-	btn.pressed.connect(func(): upgrade_chosen.emit(upgrade))
+		"common": col = Color(0.75, 0.75, 0.75)
+		"rare":   col = Color(0.35, 0.55, 1.0)
+		"epic":   col = Color(0.75, 0.30, 1.0)
+	btn.add_theme_color_override("font_color", col)
+	btn.pressed.connect(func(): _on_chosen(upgrade))
 	return btn
 
-func _on_upgrade_chosen(upgrade: Dictionary):
-	UpgradeManager.apply_upgrade(upgrade)
-	visible = false
-	GameManager.next_floor()
-	GameManager.start_turn()
+func _on_chosen(upgrade: Dictionary):
+	if is_permanent:
+		UpgradeManager.apply_permanent(upgrade)
+		get_parent().on_permanent_upgrade_chosen()
+	else:
+		UpgradeManager.apply_combat(upgrade)
+		get_parent().on_combat_upgrade_chosen()
+	chosen.emit()
