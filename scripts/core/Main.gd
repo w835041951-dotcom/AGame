@@ -49,14 +49,32 @@ func _after_detonation(_total_damage: int):
 
 func _on_boss_attacked():
 	GameManager.take_damage(5)
+	_screen_shake()
+
+func _screen_shake(intensity: float = 10.0, duration: float = 0.3):
+	var tween = create_tween()
+	var steps = 6
+	var step_dur = duration / (steps + 1)
+	for i in range(steps):
+		var offset = Vector2(randf_range(-intensity, intensity), randf_range(-intensity, intensity))
+		tween.tween_property(self, "position", offset, step_dur)
+		intensity *= 0.7
+	tween.tween_property(self, "position", Vector2.ZERO, step_dur)
 
 func _on_combat_upgrade():
 	# 暂停，显示临时升级
 	combat_upgrade_panel.show_choices(UpgradeManager.get_combat_choices(3))
+	_animate_panel_in(combat_upgrade_panel)
 
 func _on_boss_defeated():
 	await get_tree().create_timer(0.5).timeout
 	permanent_upgrade_panel.show_choices(UpgradeManager.get_permanent_choices(3))
+	_animate_panel_in(permanent_upgrade_panel)
+
+func _animate_panel_in(panel: Control):
+	panel.modulate = Color(1, 1, 1, 0)
+	var tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(panel, "modulate:a", 1.0, 0.3)
 
 func _on_game_over():
 	# TODO: 显示游戏结束画面

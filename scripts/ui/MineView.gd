@@ -43,9 +43,11 @@ func _build_grid():
 
 func _on_revealed(x: int, y: int, data: Dictionary):
 	cells[y][x].set_display_state(Cell.DisplayState.MINE_REVEALED, {"adjacent": data["adjacent"]})
+	cells[y][x].animate_reveal()
 
 func _on_bomb_found(x: int, y: int, bomb_type: String):
-	cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": bomb_type})
+	cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": bomb_type, "revealed": true})
+	cells[y][x].animate_reveal()
 
 func _reveal_all_bombs():
 	for y in range(GridManager.ROWS):

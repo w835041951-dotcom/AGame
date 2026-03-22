@@ -2,7 +2,7 @@
 
 extends Node
 
-signal explosion_visual(positions: Array, bomb_type: String)
+signal explosion_visual(bomb_positions: Array, blast_cells: Array)
 
 # ---- 爆炸范围计算 ----
 
@@ -82,12 +82,15 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 	# 步骤2: 构建 hit_map
 	var dmg_mult = UpgradeManager.get_combat_dmg_mult()
 	var hit_map: Dictionary = {}
+	var all_blast_cells: Array = []  # 所有爆炸范围格子（去重）
 	for bomb_pos in placed_bombs:
 		var bomb_type = placed_bombs[bomb_pos]
 		var base_dmg = float(BombRegistry.calculate_damage(bomb_type)) * dmg_mult
 		var chain_mult = 1.0 + chain_bonus.get(bomb_pos, 0.0)
 		var blast = get_blast_cells(bomb_pos, bomb_type)
 		for cell in blast:
+			if cell not in all_blast_cells:
+				all_blast_cells.append(cell)
 			if BossGrid.is_boss_tile(cell):
 				if cell not in hit_map:
 					hit_map[cell] = []
@@ -115,7 +118,7 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 	GameManager.sync_boss_hp()
 
 	# 爆炸视觉信号（供 PlacementView 播放动画）
-	explosion_visual.emit(placed_bombs.keys(), "")
+	explosion_visual.emit(placed_bombs.keys(), all_blast_cells)
 
 	await get_tree().create_timer(0.6).timeout
 	return total_damage

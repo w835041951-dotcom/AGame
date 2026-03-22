@@ -92,11 +92,12 @@ func total_bombs() -> int:
 # ---- Boss伤害与HP同步 ----
 func sync_boss_hp():
 	boss_hp = BossGrid.get_total_hp()
-	_check_combat_threshold()
 	if boss_hp <= 0:
 		boss_hp = 0
 		timer_running = false
 		boss_defeated.emit()
+		return
+	_check_combat_threshold()
 
 func _check_combat_threshold():
 	if boss_max_hp <= 0:

@@ -10,6 +10,7 @@ const SIZE = 52
 var mode: Mode = Mode.PLACEMENT
 var grid_x: int
 var grid_y: int
+var _current_state: DisplayState = DisplayState.EMPTY
 
 const C_EMPTY       = Color(0.25, 0.25, 0.30)
 const C_BOSS_DEAD   = Color(0.08, 0.08, 0.08)
@@ -45,10 +46,13 @@ func _on_pressed():
 		GridManager.reveal_cell(grid_x, grid_y)
 
 func set_display_state(state: DisplayState, extra: Dictionary = {}):
+	_current_state = state
 	text = ""
 	icon = null
 	disabled = false
 	expand_icon = false
+	# 每次重置 font_color，防止上次状态颜色残留
+	remove_theme_color_override("font_color")
 
 	match state:
 		DisplayState.EMPTY:
@@ -103,6 +107,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var adj = extra.get("adjacent", 0)
 			if adj > 0:
 				text = str(adj)
+				add_theme_font_size_override("font_size", 20)
 				var nc = NUMBER_COLORS[adj] if adj < NUMBER_COLORS.size() else Color.WHITE
 				add_theme_color_override("font_color", nc)
 
@@ -111,8 +116,15 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var info = BombRegistry.get_bomb_info(bomb_type)
 			var col = info.get("color", Color.RED)
 			_apply_style(col.darkened(0.4), col, 2)
-			icon = _get_bomb_texture(bomb_type)
-			expand_icon = true
+			var tex = _get_bomb_texture(bomb_type)
+			if tex != null:
+				icon = tex
+				expand_icon = true
+			else:
+				# 无图片时显示文字符号
+				text = _bomb_symbol(bomb_type)
+				add_theme_font_size_override("font_size", 22)
+				add_theme_color_override("font_color", col.lightened(0.4))
 			if extra.get("revealed", false):
 				disabled = true
 
@@ -149,9 +161,51 @@ func _show_boss_info(extra: Dictionary):
 	if text != "":
 		add_theme_color_override("font_color", Color(1.0, 1.0, 0.6))
 
+func _bomb_symbol(bomb_type: String) -> String:
+	match bomb_type:
+		"cross":   return "+"
+		"scatter": return "*"
+		"bounce":  return "~"
+		"pierce":  return "|"
+		"area":    return "#"
+		_:         return "!"
+
 func _flash_explode():
 	var tween = create_tween()
 	tween.tween_method(func(c): _apply_style(c, Color.YELLOW, 3), C_EXPLODING, C_EMPTY, 0.5)
+
+# ---- 动画方法 ----
+
+func animate_explosion_hit(delay: float = 0.0):
+	if _current_state == DisplayState.BOSS_DEAD:
+		return
+	var tween = create_tween()
+	if delay > 0.0:
+		tween.tween_interval(delay)
+	tween.tween_property(self, "modulate", Color(3.0, 2.5, 0.5), 0.06)
+	tween.tween_property(self, "modulate", Color.WHITE, 0.4)
+
+func animate_placement():
+	pivot_offset = size / 2
+	scale = Vector2(0.5, 0.5)
+	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.2)
+
+func animate_destruction():
+	pivot_offset = size / 2
+	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_property(self, "scale", Vector2(0.6, 0.6), 0.3)
+
+func animate_reveal():
+	pivot_offset = size / 2
+	scale = Vector2(0.0, 0.0)
+	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.15)
+
+func animate_boss_pulse():
+	var tween = create_tween()
+	tween.tween_property(self, "modulate", Color(1.3, 1.1, 1.0), 0.05)
+	tween.tween_property(self, "modulate", Color.WHITE, 0.25)
 
 func _apply_style(bg: Color, border: Color, border_w: int):
 	var s = StyleBoxFlat.new()

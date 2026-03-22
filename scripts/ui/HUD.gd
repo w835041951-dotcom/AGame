@@ -10,6 +10,8 @@ extends Control
 @onready var clicks_label: Label = $ClicksLabel
 
 var _last_timer_int: int = -1
+var _display_boss_hp: float = 0.0
+var _prev_player_hp: int = -1
 
 func _ready():
 	floor_label.add_theme_font_size_override("font_size", 17)
@@ -19,13 +21,21 @@ func _ready():
 	player_hp_label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4))
 	boss_hp_label.add_theme_font_size_override("font_size", 15)
 
-func _process(_delta):
+func _process(delta):
 	floor_label.text     = "第 %d 层" % GameManager.floor_number
-	player_hp_label.text = "HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]
 	clicks_label.text    = "扫雷: %d" % GameManager.current_clicks
+
+	# Boss HP 平滑过渡
 	boss_hp_bar.max_value = max(GameManager.boss_max_hp, 1)
-	boss_hp_bar.value    = GameManager.boss_hp
+	_display_boss_hp = lerp(_display_boss_hp, float(GameManager.boss_hp), delta * 8.0)
+	boss_hp_bar.value = _display_boss_hp
 	boss_hp_label.text   = "Boss: %d/%d" % [GameManager.boss_hp, GameManager.boss_max_hp]
+
+	# 玩家 HP 受伤闪红
+	player_hp_label.text = "HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]
+	if _prev_player_hp >= 0 and GameManager.player_hp < _prev_player_hp:
+		_flash_hp_label()
+	_prev_player_hp = GameManager.player_hp
 
 	var t = GameManager.turn_timer
 	timer_label.text = "⏱ %.0f" % t
@@ -38,3 +48,8 @@ func _process(_delta):
 	if warn and t_int != _last_timer_int:
 		_last_timer_int = t_int
 		AudioManager.play_sfx("timer_warn")
+
+func _flash_hp_label():
+	var tween = create_tween()
+	tween.tween_property(player_hp_label, "modulate", Color(2.0, 0.3, 0.3), 0.08)
+	tween.tween_property(player_hp_label, "modulate", Color.WHITE, 0.4)

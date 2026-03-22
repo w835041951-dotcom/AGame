@@ -15,6 +15,7 @@ func _ready():
 	BossGrid.tiles_refreshed.connect(_refresh_boss_tiles)
 	BossGrid.tile_destroyed.connect(_on_tile_destroyed)
 	GameManager.turn_started.connect(_on_turn_started)
+	ExplosionCalc.explosion_visual.connect(_on_explosion_visual)
 
 func _on_turn_started():
 	_build_grid()
@@ -62,7 +63,7 @@ func _refresh_boss_tiles():
 
 func _tile_state(tile: Dictionary) -> Cell.DisplayState:
 	if not tile["alive"]:
-		return Cell.DisplayState.BOSS_DEAD
+		return Cell.DisplayState.EMPTY  # 死亡格子变回空格，可放炸弹
 	match tile["type"]:
 		BossGrid.TileType.WEAK:   return Cell.DisplayState.BOSS_WEAK
 		BossGrid.TileType.ARMOR:  return Cell.DisplayState.BOSS_ARMOR
@@ -72,6 +73,7 @@ func _tile_state(tile: Dictionary) -> Cell.DisplayState:
 func _on_bomb_placed(pos: Vector2i, bomb_type: String):
 	if pos.y >= 0 and pos.x >= 0 and pos.y < cells.size() and pos.x < cells[pos.y].size():
 		cells[pos.y][pos.x].set_display_state(Cell.DisplayState.BOMB_PLACED, {"bomb_type": bomb_type})
+		cells[pos.y][pos.x].animate_placement()
 
 func _on_bomb_removed(pos: Vector2i):
 	if pos.y < 0 or pos.y >= cells.size() or pos.x < 0 or pos.x >= cells[pos.y].size():
@@ -91,8 +93,29 @@ func _on_bomb_removed(pos: Vector2i):
 
 func _on_boss_moved(_new_origin: Vector2i):
 	_refresh_boss_tiles()
+	# Boss格子移动脉冲动画
+	for local_pos in BossGrid.tiles:
+		if not BossGrid.tiles[local_pos]["alive"]:
+			continue
+		var world = BossGrid.local_to_world(local_pos)
+		if world.x >= 0 and world.x < BossGrid.PLACEMENT_COLS and world.y >= 0 and world.y < BossGrid.PLACEMENT_ROWS:
+			cells[world.y][world.x].animate_boss_pulse()
 
 func _on_tile_destroyed(local_pos: Vector2i, _part):
 	var world = BossGrid.local_to_world(local_pos)
 	if world.y < cells.size() and world.x < cells[world.y].size():
-		cells[world.y][world.x].set_display_state(Cell.DisplayState.BOSS_DEAD, {"local_pos": local_pos})
+		cells[world.y][world.x].animate_destruction()
+		await get_tree().create_timer(0.3).timeout
+		cells[world.y][world.x].set_display_state(Cell.DisplayState.EMPTY)
+
+func _on_explosion_visual(bomb_positions: Array, blast_cells: Array):
+	# 炸弹原点闪光
+	for pos in bomb_positions:
+		if pos.y >= 0 and pos.y < cells.size() and pos.x >= 0 and pos.x < cells[pos.y].size():
+			cells[pos.y][pos.x].set_display_state(Cell.DisplayState.EXPLODING)
+	# 爆炸范围闪光（带微小延迟）
+	for pos in blast_cells:
+		if pos in bomb_positions:
+			continue
+		if pos.y >= 0 and pos.y < cells.size() and pos.x >= 0 and pos.x < cells[pos.y].size():
+			cells[pos.y][pos.x].animate_explosion_hit(0.05)
