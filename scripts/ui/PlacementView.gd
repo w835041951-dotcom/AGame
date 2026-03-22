@@ -68,7 +68,7 @@ func _tile_state(tile: Dictionary) -> Cell.DisplayState:
 		_:                        return Cell.DisplayState.BOSS_NORMAL
 
 func _on_bomb_placed(pos: Vector2i, bomb_type: String):
-	if pos.y < cells.size() and pos.x < cells[pos.y].size():
+	if pos.y >= 0 and pos.x >= 0 and pos.y < cells.size() and pos.x < cells[pos.y].size():
 		cells[pos.y][pos.x].set_display_state(Cell.DisplayState.BOMB_PLACED, {"bomb_type": bomb_type})
 
 func _on_bomb_removed(pos: Vector2i):

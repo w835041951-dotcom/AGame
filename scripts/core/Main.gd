@@ -41,7 +41,7 @@ func _after_detonation(total_damage: int):
 	await get_tree().create_timer(0.4).timeout
 	BossGrid.random_move()
 	await get_tree().create_timer(0.3).timeout
-	GameManager.take_damage(int(5 * BossGrid.boss_attack_multiplier))
+	GameManager.take_damage(5)
 	if GameManager.player_hp <= 0:
 		return
 	await get_tree().create_timer(0.2).timeout
