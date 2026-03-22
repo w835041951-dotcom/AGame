@@ -15,34 +15,31 @@ color = Color(0.1, 0.1, 0.12, 1)
 [node name="FloorLabel" type="Label" parent="."]
 position = Vector2(16, 16)
 text = "第 1 层"
-add_theme_font_size_override("font_size", 18)
+theme_override_font_sizes/font_size = 18
 
 [node name="ClicksLabel" type="Label" parent="."]
 position = Vector2(160, 16)
 text = "点击: 5 / 5"
-add_theme_font_size_override("font_size", 18)
+theme_override_font_sizes/font_size = 18
 
 [node name="PlayerHPLabel" type="Label" parent="."]
 position = Vector2(340, 16)
 text = "HP: 30"
-add_theme_font_size_override("font_size", 18)
-add_theme_color_override("font_color", Color(0.4, 1.0, 0.4))
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.4, 1.0, 0.4)
 
 [node name="BossHPBar" type="ProgressBar" parent="."]
 position = Vector2(600, 16)
 size = Vector2(400, 28)
 max_value = 100
 value = 100
-add_theme_color_override("font_color", Color.WHITE)
 
 [node name="BossHPLabel" type="Label" parent="."]
 position = Vector2(610, 16)
 text = "Boss HP: 100"
-add_theme_font_size_override("font_size", 16)
+theme_override_font_sizes/font_size = 16
 
-[node name="DamageLabel" type="Label" parent="."]
-position = Vector2(900, 80)
-text = "-10"
-visible = false
-add_theme_font_size_override("font_size", 28)
-add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+[node name="TimerLabel" type="Label" parent="."]
+position = Vector2(1040, 16)
+text = "⏱ 60"
+theme_override_font_sizes/font_size = 20

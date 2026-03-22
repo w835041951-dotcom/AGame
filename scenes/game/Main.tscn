@@ -31,20 +31,15 @@ color = Color(0.1, 0.1, 0.12, 1)
 
 [node name="FloorLabel" type="Label" parent="HUD"]
 position = Vector2(12, 14)
-theme_override_font_sizes/font_size = 17
 
 [node name="TimerLabel" type="Label" parent="HUD"]
 position = Vector2(140, 14)
-theme_override_font_sizes/font_size = 20
 
 [node name="ClicksLabel" type="Label" parent="HUD"]
 position = Vector2(280, 14)
-theme_override_font_sizes/font_size = 16
 
 [node name="PlayerHPLabel" type="Label" parent="HUD"]
 position = Vector2(430, 14)
-theme_override_font_sizes/font_size = 16
-theme_override_colors/font_color = Color(0.4, 1.0, 0.4)
 
 [node name="BossHPBar" type="ProgressBar" parent="HUD"]
 position = Vector2(640, 14)
@@ -52,7 +47,6 @@ size = Vector2(380, 28)
 
 [node name="BossHPLabel" type="Label" parent="HUD"]
 position = Vector2(648, 14)
-theme_override_font_sizes/font_size = 15
 
 [node name="PlacementView" type="Control" parent="."]
 position = Vector2(56, 64)
@@ -75,11 +69,9 @@ size = Vector2(900, 50)
 position = Vector2(1080, 6)
 size = Vector2(180, 44)
 text = "结束回合 ▶"
-theme_override_font_sizes/font_size = 16
 
 [node name="InventoryLabel" type="Label" parent="BombSelector"]
 position = Vector2(960, 16)
-theme_override_font_sizes/font_size = 14
 
 [node name="MineView" type="Control" parent="."]
 position = Vector2(56, 482)
@@ -101,7 +93,6 @@ anchor_right = 0.5
 position = Vector2(-200, 200)
 size = Vector2(400, 48)
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 26
 
 [node name="ChoiceContainer" type="HBoxContainer" parent="CombatUpgradePanel"]
 anchor_left = 0.5
@@ -128,7 +119,6 @@ anchor_right = 0.5
 position = Vector2(-200, 200)
 size = Vector2(400, 48)
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 26
 
 [node name="ChoiceContainer" type="HBoxContainer" parent="PermanentUpgradePanel"]
 anchor_left = 0.5

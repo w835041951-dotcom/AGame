@@ -7,6 +7,7 @@ extends Control
 @onready var inventory_label: Label = $InventoryLabel
 
 func _ready():
+	end_turn_btn.add_theme_font_size_override("font_size", 16)
 	GameManager.bomb_inventory_changed.connect(_refresh)
 	GameManager.turn_started.connect(_rebuild)
 	BombPlacer.bomb_placed.connect(func(_a,_b): _refresh())

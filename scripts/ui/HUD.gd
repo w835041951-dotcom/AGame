@@ -11,6 +11,14 @@ extends Control
 
 var _last_timer_int: int = -1
 
+func _ready():
+	floor_label.add_theme_font_size_override("font_size", 17)
+	timer_label.add_theme_font_size_override("font_size", 20)
+	clicks_label.add_theme_font_size_override("font_size", 16)
+	player_hp_label.add_theme_font_size_override("font_size", 16)
+	player_hp_label.add_theme_color_override("font_color", Color(0.4, 1.0, 0.4))
+	boss_hp_label.add_theme_font_size_override("font_size", 15)
+
 func _process(_delta):
 	floor_label.text     = "第 %d 层" % GameManager.floor_number
 	player_hp_label.text = "HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]

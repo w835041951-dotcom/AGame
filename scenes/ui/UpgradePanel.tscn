@@ -19,7 +19,7 @@ position = Vector2(-150, 180)
 size = Vector2(300, 40)
 text = "选择升级"
 horizontal_alignment = 1
-add_theme_font_size_override("font_size", 28)
+theme_override_font_sizes/font_size = 28
 
 [node name="ChoiceContainer" type="HBoxContainer" parent="."]
 anchor_left = 0.5

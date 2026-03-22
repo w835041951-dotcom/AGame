@@ -34,8 +34,7 @@ func _ready():
 
 	# BGM：战斗开始
 	GameManager.turn_started.connect(func():
-		if AudioManager._current_bgm != "battle":
-			AudioManager.play_bgm("battle")
+		AudioManager.play_bgm("battle")
 	)
 
 	# 倒计时警告音（每秒一次，当剩余<10s）

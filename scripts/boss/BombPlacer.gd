@@ -35,15 +35,16 @@ func on_cell_clicked(x: int, y: int):
 		placed_bombs[pos] = selected_type
 		bomb_placed.emit(pos, selected_type)
 
-func detonate():
+func detonate() -> int:
 	if phase != Phase.PLACING:
-		return
+		return 0
 	phase = Phase.DETONATING
 	detonation_started.emit()
 	var total = await ExplosionCalc.resolve_all(placed_bombs)
 	placed_bombs.clear()
 	detonation_done.emit(total)
 	phase = Phase.DONE
+	return total
 
 func can_detonate() -> bool:
 	return phase == Phase.PLACING

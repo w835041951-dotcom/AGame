@@ -85,8 +85,7 @@ func get_combat_dmg_mult() -> float:
 	return active_combat.get("dmg_boost", 1.0)
 
 func get_chain_bonus_per_level() -> float:
-	# 临时效果可以叠加在永久基础上
-	return active_combat.get("chain_multiplier", _chain_multiplier_perm)
+	return _chain_multiplier_perm
 
 func is_double_detonate() -> bool:
 	return active_combat.get("double_detonate", false)

@@ -64,20 +64,23 @@ func reveal_cell(x: int, y: int):
 		if cell["adjacent"] == 0:
 			_auto_reveal(x, y)
 
-func _auto_reveal(x: int, y: int):
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
-			if dx == 0 and dy == 0:
-				continue
-			var nx = x + dx
-			var ny = y + dy
-			if nx >= 0 and nx < COLS and ny >= 0 and ny < ROWS:
-				var nb = grid[ny][nx]
-				if nb["state"] == CellState.HIDDEN and not nb["is_bomb"]:
-					nb["state"] = CellState.REVEALED
-					grid_revealed.emit(nx, ny, nb)
-					if nb["adjacent"] == 0:
-						_auto_reveal(nx, ny)
+func _auto_reveal(start_x: int, start_y: int):
+	var queue = [Vector2i(start_x, start_y)]
+	while queue.size() > 0:
+		var pos = queue.pop_front()
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0:
+					continue
+				var nx = pos.x + dx
+				var ny = pos.y + dy
+				if nx >= 0 and nx < COLS and ny >= 0 and ny < ROWS:
+					var nb = grid[ny][nx]
+					if nb["state"] == CellState.HIDDEN and not nb["is_bomb"]:
+						nb["state"] = CellState.REVEALED
+						grid_revealed.emit(nx, ny, nb)
+						if nb["adjacent"] == 0:
+							queue.append(Vector2i(nx, ny))
 
 func _count_adjacent(x: int, y: int) -> int:
 	var count = 0
