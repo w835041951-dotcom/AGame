@@ -21,7 +21,9 @@ const COMBAT_UPGRADES = [
 	{ "id": "dmg_boost_turn",   "name": "烈性炸药", "description": "本层所有炸弹伤害 ×1.5",  "rarity": "rare"   },
 	{ "id": "extra_weak",       "name": "暴露弱点", "description": "Boss新增1个弱点格",       "rarity": "rare"   },
 	{ "id": "double_detonate",  "name": "二次引爆", "description": "下次引爆触发两次",         "rarity": "epic"   },
-	{ "id": "reveal_bombs",     "name": "透视",     "description": "扫雷区所有炸弹位置显示",  "rarity": "rare"   },
+	{ "id": "reveal_bombs",     "name": "全图透视", "description": "扫雷区所有炸弹位置显示",  "rarity": "rare"   },
+	{ "id": "reveal_area",      "name": "局部透视", "description": "随机翻开扫雷区5×5区域",   "rarity": "common" },
+	{ "id": "freeze_boss",      "name": "冻结Boss", "description": "本回合Boss不移动",         "rarity": "rare"   },
 	{ "id": "heal_combat",      "name": "战场急救", "description": "立即回复 8 点HP",         "rarity": "common" },
 ]
 
@@ -30,6 +32,8 @@ var active_combat: Dictionary = {}  # effect_id -> bool or value
 
 # ---- 永久效果状态 ----
 var _chain_multiplier_perm: float = 0.3  # 默认值，chain_boost 升级后变 0.5
+
+signal reveal_bombs_triggered
 
 func get_permanent_choices(count: int = 3) -> Array:
 	var pool = PERMANENT_UPGRADES.duplicate()
@@ -75,6 +79,13 @@ func apply_combat(upgrade: Dictionary):
 			active_combat["double_detonate"] = true
 		"reveal_bombs":
 			active_combat["reveal_bombs"] = true
+			reveal_bombs_triggered.emit()
+		"reveal_area":
+			var cx = randi_range(2, GridManager.COLS - 3)
+			var cy = randi_range(2, GridManager.ROWS - 3)
+			GridManager.reveal_area(cx, cy, 2)
+		"freeze_boss":
+			active_combat["freeze_boss"] = true
 		"heal_combat":
 			GameManager.heal(8)
 
@@ -95,3 +106,9 @@ func consume_double_detonate():
 
 func is_reveal_bombs() -> bool:
 	return active_combat.get("reveal_bombs", false)
+
+func is_boss_frozen() -> bool:
+	return active_combat.get("freeze_boss", false)
+
+func consume_freeze_boss():
+	active_combat.erase("freeze_boss")

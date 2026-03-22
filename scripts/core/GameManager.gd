@@ -26,8 +26,8 @@ var max_clicks: int = 5
 var bomb_inventory: Dictionary = {}  # bomb_type -> count
 
 # ---- 倒计时 ----
-var turn_timer: float = 60.0
-var turn_duration: float = 60.0
+var turn_timer: float = 30.0
+var turn_duration: float = 30.0
 var timer_running: bool = false
 
 # ---- 临时升级阈值 ----
@@ -124,7 +124,8 @@ func next_floor():
 	bomb_inventory.clear()
 	bomb_inventory_changed.emit()
 	max_clicks = 5 + floor_number
-	turn_duration = min(turn_duration, 120.0)  # 最长2分钟
+	turn_duration = min(turn_duration, 120.0)
+	GridManager.reset_for_new_floor()
 	# boss_hp 由 BossGrid.setup() 后 sync_boss_hp() 设置
 
 # ---- 初始化Boss总HP ----

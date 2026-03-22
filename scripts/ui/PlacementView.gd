@@ -4,7 +4,7 @@ extends Control
 
 const CellScene = preload("res://scenes/game/Cell.tscn")
 const Cell = preload("res://scripts/ui/Cell.gd")
-const CELL_SIZE = 52
+const CELL_SIZE = 64
 
 var cells: Array = []  # cells[y][x]
 

@@ -4,7 +4,7 @@ extends Control
 
 const CellScene = preload("res://scenes/game/Cell.tscn")
 const Cell = preload("res://scripts/ui/Cell.gd")
-const CELL_SIZE = 52
+const CELL_SIZE = 64
 
 var cells: Array = []
 
@@ -13,6 +13,7 @@ func _ready():
 	GridManager.bomb_found.connect(_on_bomb_found)
 	GameManager.turn_started.connect(_on_turn_started)
 	GameManager.clicks_exhausted.connect(_on_clicks_exhausted)
+	UpgradeManager.reveal_bombs_triggered.connect(_reveal_all_bombs)
 
 func _on_clicks_exhausted():
 	for row in cells:
@@ -21,10 +22,17 @@ func _on_clicks_exhausted():
 				cell.disabled = true
 
 func _on_turn_started():
-	_build_grid()
-	GridManager.generate_grid()
-	if UpgradeManager.is_reveal_bombs():
-		_reveal_all_bombs()
+	if GridManager.grid.is_empty():
+		_build_grid()
+		GridManager.generate_grid()
+		if UpgradeManager.is_reveal_bombs():
+			_reveal_all_bombs()
+	else:
+		# 扫雷图已存在，只重新渲染UI（保留翻开状态）
+		_build_grid()
+		_restore_revealed_cells()
+		if UpgradeManager.is_reveal_bombs():
+			_reveal_all_bombs()
 
 func _build_grid():
 	cells.clear()
@@ -55,3 +63,13 @@ func _reveal_all_bombs():
 			var cell = GridManager.get_cell(x, y)
 			if cell.get("is_bomb", false) and cell.get("state") == GridManager.CellState.HIDDEN:
 				cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": cell["bomb_type"]})
+
+func _restore_revealed_cells():
+	for y in range(GridManager.ROWS):
+		for x in range(GridManager.COLS):
+			var cell = GridManager.get_cell(x, y)
+			if cell.get("state") == GridManager.CellState.REVEALED:
+				if cell.get("is_bomb", false):
+					cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": cell["bomb_type"], "revealed": true})
+				else:
+					cells[y][x].set_display_state(Cell.DisplayState.MINE_REVEALED, {"adjacent": cell["adjacent"]})

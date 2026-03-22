@@ -1,5 +1,6 @@
 ## 扫雷区逻辑 - AutoLoad
 ## 翻到炸弹 = 加入库存，不再直接触发攻击
+## 每层只生成一次扫雷图，多回合共享同一张图
 
 extends Node
 
@@ -8,13 +9,18 @@ signal bomb_found(x: int, y: int, bomb_type: String)
 
 const COLS = 10
 const ROWS = 5
-const BOMB_COUNT = 12
+const BOMB_COUNT = 8
 
 var grid: Array = []
+var _grid_generated: bool = false  # 本层是否已生成过扫雷图
 
 enum CellState { HIDDEN, REVEALED }
 
 func generate_grid():
+	# 每层只生成一次，多回合共用同一张扫雷图
+	if _grid_generated:
+		return
+	_grid_generated = true
 	grid.clear()
 	for y in range(ROWS):
 		var row = []
@@ -55,10 +61,9 @@ func reveal_cell(x: int, y: int):
 	cell["state"] = CellState.REVEALED
 
 	if cell["is_bomb"]:
-		# 找到炸弹 = 加入库存
+		# 找到炸弹 = 加入库存，只发 bomb_found（不发 grid_revealed 避免覆盖显示）
 		GameManager.add_bomb(cell["bomb_type"])
 		bomb_found.emit(x, y, cell["bomb_type"])
-		grid_revealed.emit(x, y, cell)
 	else:
 		grid_revealed.emit(x, y, cell)
 		if cell["adjacent"] == 0:
@@ -99,3 +104,24 @@ func get_cell(x: int, y: int) -> Dictionary:
 	if x < 0 or x >= COLS or y < 0 or y >= ROWS:
 		return {}
 	return grid[y][x]
+
+func reset_for_new_floor():
+	grid.clear()
+	_grid_generated = false
+
+func reveal_area(cx: int, cy: int, radius: int = 1):
+	# 透视：强制揭示以(cx,cy)为中心的radius格范围（不扣点击次数）
+	for dy in range(-radius, radius + 1):
+		for dx in range(-radius, radius + 1):
+			var nx = cx + dx
+			var ny = cy + dy
+			if nx < 0 or nx >= COLS or ny < 0 or ny >= ROWS:
+				continue
+			var cell = grid[ny][nx]
+			if cell["state"] != CellState.HIDDEN:
+				continue
+			cell["state"] = CellState.REVEALED
+			if cell["is_bomb"]:
+				GameManager.add_bomb(cell["bomb_type"])
+				bomb_found.emit(nx, ny, cell["bomb_type"])
+			grid_revealed.emit(nx, ny, cell)
