@@ -227,10 +227,12 @@ func _get_boss_cell_texture(local_pos: Vector2i) -> AtlasTexture:
 	var tex = _boss_textures[tex_path]
 	if tex == null:
 		return null
-	# atlas 中每格固定 64px（PNG 的实际像素大小）
-	var region = Rect2(local_pos.x * 64, local_pos.y * 64, 64, 64)
+	# 根据贴图实际尺寸和Boss包围盒大小动态计算每格像素大小
+	var tile_w = int(tex.get_width()  / float(BossGrid.boss_width))
+	var tile_h = int(tex.get_height() / float(BossGrid.boss_height))
+	var region = Rect2(local_pos.x * tile_w, local_pos.y * tile_h, tile_w, tile_h)
 	# 安全检查：不超出贴图边界
-	if region.position.x + 64 > tex.get_width() or region.position.y + 64 > tex.get_height():
+	if region.position.x + tile_w > tex.get_width() or region.position.y + tile_h > tex.get_height():
 		return null
 	var atlas = AtlasTexture.new()
 	atlas.atlas = tex

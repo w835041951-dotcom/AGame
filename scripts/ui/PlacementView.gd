@@ -103,9 +103,11 @@ func _on_boss_moved(_new_origin: Vector2i):
 
 func _on_tile_destroyed(local_pos: Vector2i, _part):
 	var world = BossGrid.local_to_world(local_pos)
+	if world.x < 0 or world.y < 0 or world.y >= cells.size() or world.x >= cells[world.y].size():
+		return
+	cells[world.y][world.x].animate_destruction()
+	await get_tree().create_timer(0.3).timeout
 	if world.y < cells.size() and world.x < cells[world.y].size():
-		cells[world.y][world.x].animate_destruction()
-		await get_tree().create_timer(0.3).timeout
 		cells[world.y][world.x].set_display_state(Cell.DisplayState.BOSS_DEAD, {
 			"local_pos": local_pos
 		})
@@ -159,7 +161,9 @@ func _process(_delta):
 	for cell_pos in blast:
 		if cell_pos.y >= 0 and cell_pos.y < cells.size() and cell_pos.x >= 0 and cell_pos.x < cells[cell_pos.y].size():
 			var c = cells[cell_pos.y][cell_pos.x]
-			if c._current_state != Cell.DisplayState.BOMB_PLACED and c._current_state != Cell.DisplayState.EXPLODING:
+			if c._current_state != Cell.DisplayState.BOMB_PLACED \
+					and c._current_state != Cell.DisplayState.EXPLODING \
+					and c._current_state != Cell.DisplayState.BOSS_DEAD:
 				c.modulate = Color(1.3, 1.1, 0.7, 0.85)
 
 func _clear_preview():
