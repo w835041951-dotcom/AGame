@@ -138,8 +138,7 @@ func take_damage(amount: int):
 func next_floor():
 	floor_number += 1
 	triggered_thresholds.clear()
-	bomb_inventory.clear()
-	bomb_inventory_changed.emit()
+	# bomb_inventory 保留，炸弹可以带入下一关
 	max_clicks = LevelData.get_max_clicks(floor_number)
 	turn_duration = LevelData.get_turn_duration(floor_number)
 	GridManager.reset_for_new_floor()

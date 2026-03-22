@@ -58,11 +58,17 @@ func _restore_clickable():
 
 func _on_revealed(x: int, y: int, data: Dictionary):
 	cells[y][x].set_display_state(Cell.DisplayState.MINE_REVEALED, {"adjacent": data["adjacent"]})
-	cells[y][x].animate_reveal()
+	if GridManager.is_magic_reveal:
+		cells[y][x].animate_magic_reveal()
+	else:
+		cells[y][x].animate_reveal()
 
 func _on_bomb_found(x: int, y: int, bomb_type: String):
 	cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": bomb_type, "revealed": true})
-	cells[y][x].animate_reveal()
+	if GridManager.is_magic_reveal:
+		cells[y][x].animate_magic_reveal()
+	else:
+		cells[y][x].animate_reveal()
 
 func _reveal_all_bombs():
 	for y in range(GridManager.rows):
@@ -70,3 +76,14 @@ func _reveal_all_bombs():
 			var cell = GridManager.get_cell(x, y)
 			if cell.get("is_bomb", false) and cell.get("state") == GridManager.CellState.HIDDEN:
 				cells[y][x].set_display_state(Cell.DisplayState.MINE_BOMB, {"bomb_type": cell["bomb_type"]})
+				cells[y][x].animate_magic_reveal()
+
+func count_correct_marks() -> int:
+	var count = 0
+	for y in range(cells.size()):
+		for x in range(cells[y].size()):
+			if cells[y][x].is_marked():
+				var data = GridManager.get_cell(x, y)
+				if data.get("is_bomb", false):
+					count += 1
+	return count

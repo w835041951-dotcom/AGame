@@ -183,9 +183,43 @@ func _on_combat_upgrade():
 	_animate_panel_in(combat_upgrade_panel)
 
 func _on_boss_defeated():
-	await get_tree().create_timer(0.5).timeout
+	# 先等爆炸动画看完
+	await get_tree().create_timer(0.8).timeout
+	# 结算正确标记回血
+	var correct = mine_view.count_correct_marks()
+	if correct > 0:
+		await _show_mark_heal_animation(correct)
+	# 再显示永久升级面板
+	await get_tree().create_timer(0.3).timeout
 	permanent_upgrade_panel.show_choices(UpgradeManager.get_permanent_choices(3))
 	_animate_panel_in(permanent_upgrade_panel)
+
+func _show_mark_heal_animation(count: int):
+	AudioManager.play_sfx("upgrade_pick")
+	var canvas = CanvasLayer.new()
+	canvas.layer = 80
+	add_child(canvas)
+	for i in range(count):
+		GameManager.heal(1)
+		var lbl = Label.new()
+		lbl.text = "+1 HP"
+		lbl.add_theme_font_size_override("font_size", 36)
+		lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.45))
+		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		lbl.add_theme_constant_override("shadow_offset_x", 2)
+		lbl.add_theme_constant_override("shadow_offset_y", 2)
+		lbl.position = Vector2(randf_range(700, 1100), randf_range(420, 580))
+		lbl.modulate = Color(1, 1, 1, 0)
+		canvas.add_child(lbl)
+		var tw = create_tween()
+		tw.tween_property(lbl, "modulate:a", 1.0, 0.15)
+		tw.tween_property(lbl, "position:y", lbl.position.y - 60, 0.6).set_trans(Tween.TRANS_CUBIC)
+		tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.3).set_delay(0.35)
+		if i < count - 1:
+			AudioManager.play_sfx("mine_reveal")
+			await get_tree().create_timer(0.18).timeout
+	await get_tree().create_timer(0.55).timeout
+	canvas.queue_free()
 
 func _animate_panel_in(panel: Control):
 	panel.modulate = Color(1, 1, 1, 0)

@@ -33,9 +33,12 @@ const NUMBER_COLORS = [
 ]
 
 static var _bomb_textures: Dictionary = {}
-static var _boss_texture: Texture2D = null
+static var _boss_textures: Dictionary = {}  # path -> Texture2D
 
 var _marked_safe: bool = false  # 右键标记为"安全/空"
+
+func is_marked() -> bool:
+	return _marked_safe
 
 func setup(x: int, y: int, m: Mode, sz: int = 64):
 	grid_x = x
@@ -81,6 +84,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 	icon = null
 	disabled = false
 	expand_icon = false
+	tooltip_text = ""
 	# 每次重置颜色和字号，防止上次状态残留
 	remove_theme_color_override("font_color")
 	remove_theme_color_override("font_disabled_color")
@@ -97,6 +101,10 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			_apply_style(col.darkened(0.5), col, 2)
 			icon = _get_bomb_texture(bomb_type)
 			expand_icon = true
+			# 悬停提示：显示炸弹等级和范围
+			var lvl = BombRegistry.get_bomb_level(bomb_type)
+			var range_desc = BombRegistry.get_range_description(bomb_type)
+			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), lvl, range_desc]
 
 		DisplayState.BLOCKED:
 			_apply_style(Color(0.22, 0.05, 0.05), Color(0.65, 0.15, 0.15), 2)
@@ -161,6 +169,10 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 				var tc = col.lightened(0.5)
 				add_theme_color_override("font_color", tc)
 				add_theme_color_override("font_disabled_color", tc)
+			# 悬停提示
+			var mine_lvl = BombRegistry.get_bomb_level(bomb_type)
+			var mine_range = BombRegistry.get_range_description(bomb_type)
+			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), mine_lvl, mine_range]
 			if extra.get("revealed", false):
 				disabled = true
 
@@ -177,15 +189,23 @@ func _get_bomb_texture(bomb_type: String) -> Texture2D:
 	return null
 
 func _get_boss_cell_texture(local_pos: Vector2i) -> AtlasTexture:
-	if _boss_texture == null:
-		var path = "res://assets/sprites/boss/boss_full.png"
-		if ResourceLoader.exists(path):
-			_boss_texture = load(path)
-	if _boss_texture == null:
+	var tex_path = LevelData.get_boss_texture_path(GameManager.floor_number)
+	if not _boss_textures.has(tex_path):
+		if ResourceLoader.exists(tex_path):
+			_boss_textures[tex_path] = load(tex_path)
+		else:
+			return null
+	var tex = _boss_textures[tex_path]
+	if tex == null:
+		return null
+	# atlas 中每格固定 64px（PNG 的实际像素大小）
+	var region = Rect2(local_pos.x * 64, local_pos.y * 64, 64, 64)
+	# 安全检查：不超出贴图边界
+	if region.position.x + 64 > tex.get_width() or region.position.y + 64 > tex.get_height():
 		return null
 	var atlas = AtlasTexture.new()
-	atlas.atlas = _boss_texture
-	atlas.region = Rect2(local_pos.x * SIZE, local_pos.y * SIZE, SIZE, SIZE)
+	atlas.atlas = tex
+	atlas.region = region
 	return atlas
 
 func _show_boss_info(extra: Dictionary):
@@ -237,6 +257,22 @@ func animate_reveal():
 	scale = Vector2(0.0, 0.0)
 	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "scale", Vector2.ONE, 0.15)
+
+func animate_magic_reveal():
+	# 透视升级专用动画：紫色光晕 + 旋转缩放
+	pivot_offset = size / 2
+	scale = Vector2(0.0, 0.0)
+	modulate = Color(0.6, 0.3, 1.0, 0.0)  # 紫色透明
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "modulate", Color(0.6, 0.3, 1.0, 1.0), 0.15)
+	tween.tween_property(self, "rotation", TAU, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await tween.finished
+	rotation = 0.0
+	# 从紫色过渡到正常白色
+	var tw2 = create_tween()
+	tw2.tween_property(self, "modulate", Color.WHITE, 0.3)
 
 func animate_boss_pulse():
 	var tween = create_tween()
