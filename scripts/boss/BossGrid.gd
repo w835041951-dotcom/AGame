@@ -131,15 +131,12 @@ func _on_tile_destroyed(local_pos: Vector2i, tile: Dictionary):
 signal boss_attacked  # Boss走出左边界，攻击玩家
 
 func move_left():
-	# Boss每回合向左移动一格
+	# Boss每回合向左移动一格；到左边界后停住并每回合持续扣血
 	if boss_origin.x > 0:
 		boss_origin.x -= 1
-		boss_moved.emit(boss_origin)
 	else:
-		# 已到左边界 → 攻击玩家 → 重置到右侧
 		boss_attacked.emit()
-		boss_origin.x = PLACEMENT_COLS - BOSS_COLS
-		boss_moved.emit(boss_origin)
+	boss_moved.emit(boss_origin)
 
 func random_move():
 	move_left()
