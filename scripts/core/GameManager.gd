@@ -55,11 +55,15 @@ func end_turn():
 	timer_running = false
 	turn_ended.emit()
 
+signal clicks_exhausted
+
 # ---- 扫雷点击 ----
 func use_click() -> bool:
 	if current_clicks <= 0:
 		return false
 	current_clicks -= 1
+	if current_clicks == 0:
+		clicks_exhausted.emit()
 	return true
 
 # ---- 炸弹库存 ----

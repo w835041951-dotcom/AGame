@@ -4,7 +4,7 @@ extends Control
 
 const CellScene = preload("res://scenes/game/Cell.tscn")
 const Cell = preload("res://scripts/ui/Cell.gd")
-const CELL_SIZE = 58
+const CELL_SIZE = 52
 
 var cells: Array = []
 
@@ -12,6 +12,13 @@ func _ready():
 	GridManager.grid_revealed.connect(_on_revealed)
 	GridManager.bomb_found.connect(_on_bomb_found)
 	GameManager.turn_started.connect(_on_turn_started)
+	GameManager.clicks_exhausted.connect(_on_clicks_exhausted)
+
+func _on_clicks_exhausted():
+	for row in cells:
+		for cell in row:
+			if not cell.disabled:
+				cell.disabled = true
 
 func _on_turn_started():
 	_build_grid()
