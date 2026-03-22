@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cell"]
+
+[ext_resource type="Script" path="res://scripts/ui/Cell.gd" id="1"]
+
+[node name="Cell" type="Button"]
+custom_minimum_size = Vector2(64, 64)
+size = Vector2(64, 64)
+script = ExtResource("1")

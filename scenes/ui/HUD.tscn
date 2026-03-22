@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://hud"]
+
+[ext_resource type="Script" path="res://scripts/ui/HUD.gd" id="1"]
+
+[node name="HUD" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="BG" type="ColorRect" parent="."]
+anchor_right = 1.0
+size = Vector2(1280, 60)
+color = Color(0.1, 0.1, 0.12, 1)
+
+[node name="FloorLabel" type="Label" parent="."]
+position = Vector2(16, 16)
+text = "第 1 层"
+add_theme_font_size_override("font_size", 18)
+
+[node name="ClicksLabel" type="Label" parent="."]
+position = Vector2(160, 16)
+text = "点击: 5 / 5"
+add_theme_font_size_override("font_size", 18)
+
+[node name="PlayerHPLabel" type="Label" parent="."]
+position = Vector2(340, 16)
+text = "HP: 30"
+add_theme_font_size_override("font_size", 18)
+add_theme_color_override("font_color", Color(0.4, 1.0, 0.4))
+
+[node name="BossHPBar" type="ProgressBar" parent="."]
+position = Vector2(600, 16)
+size = Vector2(400, 28)
+max_value = 100
+value = 100
+add_theme_color_override("font_color", Color.WHITE)
+
+[node name="BossHPLabel" type="Label" parent="."]
+position = Vector2(610, 16)
+text = "Boss HP: 100"
+add_theme_font_size_override("font_size", 16)
+
+[node name="DamageLabel" type="Label" parent="."]
+position = Vector2(900, 80)
+text = "-10"
+visible = false
+add_theme_font_size_override("font_size", 28)
+add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
