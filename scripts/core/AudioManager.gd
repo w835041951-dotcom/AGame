@@ -45,10 +45,19 @@ var _current_bgm: String = ""
 var _sfx_cache: Dictionary = {}  # 缓存已加载的音效
 
 func _ready():
+	_ensure_bus("Music")
+	_ensure_bus("SFX")
 	bgm_player.bus = "Music"
 	sfx_player.bus = "SFX"
 	_set_bus_volume("Music", music_volume)
 	_set_bus_volume("SFX", sfx_volume)
+
+func _ensure_bus(bus_name: String):
+	if AudioServer.get_bus_index(bus_name) == -1:
+		AudioServer.add_bus()
+		var idx = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(idx, bus_name)
+		AudioServer.set_bus_send(idx, "Master")
 
 # ---- BGM ----
 
