@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://audiomanager"]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/core/AudioManager.gd" id="1"]
 
