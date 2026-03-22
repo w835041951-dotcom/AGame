@@ -12,7 +12,7 @@ config_version=5
 
 config/name="炸弹人勇闯100层地牢"
 config/description="扫雷找炸弹，放置炸弹打Boss，勇闯100层地牢"
-run/main_scene="res://scenes/game/Main.tscn"
+run/main_scene="res://scenes/ui/TitleScreen.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 

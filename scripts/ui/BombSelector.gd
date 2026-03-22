@@ -51,7 +51,9 @@ func _refresh(_n = null):
 		if type_id != "":
 			var count = GameManager.get_bomb_count(type_id)
 			var info = BombRegistry.get_bomb_info(type_id)
-			btn.text = "%s %s\n[%d]" % [_bomb_icon(type_id), info.get("name",""), count]
+			var lvl = BombRegistry.get_bomb_level(type_id)
+			btn.text = "%s %s Lv.%d\n[%d]" % [_bomb_icon(type_id), info.get("name",""), lvl, count]
+			btn.tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name",""), lvl, BombRegistry.get_range_description(type_id)]
 			btn.disabled = (count == 0)
 	# 总库存
 	inventory_label.text = "库存: %d" % GameManager.total_bombs()
@@ -101,9 +103,9 @@ func _update_selection():
 
 func _bomb_icon(type_id: String) -> String:
 	match type_id:
+		"pierce_h": return "↔"
+		"pierce_v": return "↕"
 		"cross": return "+"
-		"scatter": return "*"
+		"x_shot": return "╳"
 		"bounce": return "~"
-		"pierce": return "|"
-		"area": return "#"
 		_: return "!"

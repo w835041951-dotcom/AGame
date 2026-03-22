@@ -64,7 +64,7 @@ func _refresh_boss_tiles():
 
 func _tile_state(tile: Dictionary) -> Cell.DisplayState:
 	if not tile["alive"]:
-		return Cell.DisplayState.EMPTY  # 死亡格子变回空格，可放炸弹
+		return Cell.DisplayState.BOSS_DEAD  # 死亡格子保留轮廓，可放炸弹
 	match tile["type"]:
 		BossGrid.TileType.WEAK:   return Cell.DisplayState.BOSS_WEAK
 		BossGrid.TileType.ARMOR:  return Cell.DisplayState.BOSS_ARMOR
@@ -79,16 +79,13 @@ func _on_bomb_placed(pos: Vector2i, bomb_type: String):
 func _on_bomb_removed(pos: Vector2i):
 	if pos.y < 0 or pos.y >= cells.size() or pos.x < 0 or pos.x >= cells[pos.y].size():
 		return
-	if BossGrid.is_boss_tile(pos):
-		var tile = BossGrid.get_tile(pos)
+	var tile = BossGrid.get_tile(pos)
+	if not tile.is_empty():
 		var local_pos = BossGrid.world_to_local(pos)
-		if tile.is_empty():
-			cells[pos.y][pos.x].set_display_state(Cell.DisplayState.EMPTY)
-		else:
-			cells[pos.y][pos.x].set_display_state(_tile_state(tile), {
-				"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"],
-				"local_pos": local_pos
-			})
+		cells[pos.y][pos.x].set_display_state(_tile_state(tile), {
+			"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"],
+			"local_pos": local_pos
+		})
 	else:
 		cells[pos.y][pos.x].set_display_state(Cell.DisplayState.EMPTY)
 
@@ -107,7 +104,9 @@ func _on_tile_destroyed(local_pos: Vector2i, _part):
 	if world.y < cells.size() and world.x < cells[world.y].size():
 		cells[world.y][world.x].animate_destruction()
 		await get_tree().create_timer(0.3).timeout
-		cells[world.y][world.x].set_display_state(Cell.DisplayState.EMPTY)
+		cells[world.y][world.x].set_display_state(Cell.DisplayState.BOSS_DEAD, {
+			"local_pos": local_pos
+		})
 
 func _on_explosion_visual(bomb_positions: Array, blast_cells: Array):
 	# 炸弹原点闪光

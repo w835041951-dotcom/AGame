@@ -3,28 +3,26 @@
 
 extends Node
 
-# ---- 永久升级池 ----
+# ---- 永久升级池（通关奖励 - 炸弹升级） ----
 const PERMANENT_UPGRADES = [
-	{ "id": "more_clicks",    "name": "专注",     "description": "扫雷点击次数 +1",       "rarity": "common" },
+	{ "id": "bomb_range_up",  "name": "范围扩展", "description": "所有炸弹攻击范围 +1",   "rarity": "rare"   },
 	{ "id": "bomb_dmg_up",    "name": "火药加强", "description": "所有炸弹基础伤害 +3",   "rarity": "common" },
-	{ "id": "unlock_bounce",  "name": "反弹炸弹", "description": "解锁反弹炸弹",          "rarity": "rare"   },
-	{ "id": "unlock_pierce",  "name": "穿透炸弹", "description": "解锁穿透炸弹",          "rarity": "rare"   },
-	{ "id": "unlock_area",    "name": "爆炸半径", "description": "解锁爆炸炸弹(5x5)",     "rarity": "epic"   },
-	{ "id": "max_hp_up",      "name": "强化体魄", "description": "最大HP +5，立即回复",   "rarity": "common" },
-	{ "id": "more_time",      "name": "时间掌控", "description": "每回合时间 +10秒",      "rarity": "rare"   },
+	{ "id": "unlock_cross",   "name": "十字炮",   "description": "解锁十字炮炸弹",          "rarity": "rare"   },
+	{ "id": "unlock_x_shot",  "name": "X发射",    "description": "解锁X发射炸弹",            "rarity": "rare"   },
+	{ "id": "unlock_bounce",  "name": "反弹炸弹", "description": "解锁反弹炸弹",            "rarity": "epic"   },
 	{ "id": "chain_boost",    "name": "连锁大师", "description": "连锁加成从30%提升到50%","rarity": "epic"   },
 ]
 
-# ---- 临时升级池 ----
+# ---- 临时升级池（血量阶段奖励 - 棋盘效果） ----
 const COMBAT_UPGRADES = [
-	{ "id": "extra_bombs",      "name": "弹药补给", "description": "立即获得2个当前类型炸弹", "rarity": "common" },
-	{ "id": "dmg_boost_turn",   "name": "烈性炸药", "description": "本层所有炸弹伤害 ×1.5",  "rarity": "rare"   },
-	{ "id": "extra_weak",       "name": "暴露弱点", "description": "Boss新增1个弱点格",       "rarity": "rare"   },
-	{ "id": "double_detonate",  "name": "二次引爆", "description": "下次引爆触发两次",         "rarity": "epic"   },
 	{ "id": "reveal_bombs",     "name": "全图透视", "description": "扫雷区所有炸弹位置显示",  "rarity": "rare"   },
 	{ "id": "reveal_area",      "name": "局部透视", "description": "随机翻开扫雷区5×5区域",   "rarity": "common" },
+	{ "id": "extra_weak",       "name": "暴露弱点", "description": "Boss新增1个弱点格",       "rarity": "rare"   },
 	{ "id": "freeze_boss",      "name": "冻结Boss", "description": "本回合Boss不移动",         "rarity": "rare"   },
 	{ "id": "heal_combat",      "name": "战场急救", "description": "立即回复 8 点HP",         "rarity": "common" },
+	{ "id": "more_clicks",      "name": "额外点击", "description": "本层扫雷点击次数 +2",   "rarity": "common" },
+	{ "id": "extra_bombs",      "name": "弹药补给", "description": "立即获得2个当前类型炸弹", "rarity": "common" },
+	{ "id": "double_detonate",  "name": "二次引爆", "description": "下次引爆触发两次",         "rarity": "epic"   },
 ]
 
 # ---- 临时效果状态 ----
@@ -47,36 +45,22 @@ func get_combat_choices(count: int = 3) -> Array:
 
 func apply_permanent(upgrade: Dictionary):
 	match upgrade["id"]:
-		"more_clicks":
-			GameManager.max_clicks += 1
+		"bomb_range_up":
+			BombRegistry.upgrade_all_bomb_levels()
 		"bomb_dmg_up":
 			for key in BombRegistry.BOMB_TYPES:
 				BombRegistry.BOMB_TYPES[key]["damage"] += 3
+		"unlock_cross":
+			BombRegistry.unlock_type("cross")
+		"unlock_x_shot":
+			BombRegistry.unlock_type("x_shot")
 		"unlock_bounce":
 			BombRegistry.unlock_type("bounce")
-		"unlock_pierce":
-			BombRegistry.unlock_type("pierce")
-		"unlock_area":
-			BombRegistry.unlock_type("area")
-		"max_hp_up":
-			GameManager.player_max_hp += 5
-			GameManager.heal(5)
-		"more_time":
-			GameManager.turn_duration += 10.0
 		"chain_boost":
 			_chain_multiplier_perm = 0.5
 
 func apply_combat(upgrade: Dictionary):
 	match upgrade["id"]:
-		"extra_bombs":
-			GameManager.add_bomb(BombPlacer.selected_type)
-			GameManager.add_bomb(BombPlacer.selected_type)
-		"dmg_boost_turn":
-			active_combat["dmg_boost"] = 1.5
-		"extra_weak":
-			BossGrid.refresh_weak_tiles()
-		"double_detonate":
-			active_combat["double_detonate"] = true
 		"reveal_bombs":
 			active_combat["reveal_bombs"] = true
 			reveal_bombs_triggered.emit()
@@ -84,10 +68,19 @@ func apply_combat(upgrade: Dictionary):
 			var cx = randi_range(2, GridManager.cols - 3)
 			var cy = randi_range(2, GridManager.rows - 3)
 			GridManager.reveal_area(cx, cy, 2)
+		"extra_weak":
+			BossGrid.refresh_weak_tiles()
 		"freeze_boss":
 			active_combat["freeze_boss"] = true
 		"heal_combat":
 			GameManager.heal(8)
+		"more_clicks":
+			GameManager.current_clicks += 2
+		"extra_bombs":
+			GameManager.add_bomb(BombPlacer.selected_type)
+			GameManager.add_bomb(BombPlacer.selected_type)
+		"double_detonate":
+			active_combat["double_detonate"] = true
 
 func clear_combat_effects():
 	active_combat.clear()

@@ -6,7 +6,7 @@ enum Phase { IDLE, PLACING, DETONATING, DONE }
 
 var phase: Phase = Phase.IDLE
 var placed_bombs: Dictionary = {}  # Vector2i(放置区世界坐标) -> bomb_type String
-var selected_type: String = "cross"
+var selected_type: String = "pierce_h"
 
 signal bomb_placed(pos: Vector2i, bomb_type: String)
 signal bomb_removed(pos: Vector2i)

@@ -134,6 +134,14 @@ const SHAPE_MAP = {
 	"DEMON": SHAPE_DEMON,
 }
 
+const BOSS_TEXTURE_MAP = {
+	"GARGOYLE": "res://assets/sprites/boss/boss_gargoyle.png",
+	"SPIDER":   "res://assets/sprites/boss/boss_spider.png",
+	"SERPENT":  "res://assets/sprites/boss/boss_serpent.png",
+	"GIANT":    "res://assets/sprites/boss/boss_giant.png",
+	"DEMON":    "res://assets/sprites/boss/boss_demon.png",
+}
+
 # ── 查询接口 ──
 
 func get_level(floor_number: int) -> Dictionary:
@@ -176,6 +184,10 @@ func get_mine_rows(floor_number: int) -> int:
 func get_boss_shape(floor_number: int) -> Array:
 	var key = get_level(floor_number)["boss_shape"]
 	return SHAPE_MAP[key]
+
+func get_boss_texture_path(floor_number: int) -> String:
+	var key = get_level(floor_number)["boss_shape"]
+	return BOSS_TEXTURE_MAP[key]
 
 # 根据棋盘大小自动计算格子像素大小，保证放置区+扫雷区不超过可用高度
 func get_cell_size(floor_number: int) -> int:

@@ -7,13 +7,14 @@ signal explosion_visual(bomb_positions: Array, blast_cells: Array)
 # ---- 爆炸范围计算 ----
 
 func get_blast_cells(origin: Vector2i, bomb_type: String) -> Array:
+	var lvl = BombRegistry.get_bomb_level(bomb_type)
 	match bomb_type:
-		"cross":   return _cross(origin, 3)
-		"scatter": return _rect(origin, 1)
-		"area":    return _rect(origin, 2)
-		"pierce":  return _pierce(origin)
-		"bounce":  return _bounce(origin)
-		_:         return _cross(origin, 2)
+		"pierce_h": return _line_h(origin, 1 + lvl)
+		"pierce_v": return _line_v(origin, 1 + lvl)
+		"cross":    return _cross(origin, 1 + lvl)
+		"x_shot":   return _x_diag(origin, 1 + lvl)
+		"bounce":   return _bounce(origin, lvl)
+		_:          return _cross(origin, 1 + lvl)
 
 func _cross(origin: Vector2i, reach: int) -> Array:
 	var cells = []
@@ -23,25 +24,35 @@ func _cross(origin: Vector2i, reach: int) -> Array:
 			cells.append(Vector2i(origin.x, origin.y + i))
 	return cells
 
-func _rect(origin: Vector2i, half: int) -> Array:
+func _line_h(origin: Vector2i, reach: int) -> Array:
 	var cells = []
-	for dy in range(-half, half + 1):
-		for dx in range(-half, half + 1):
-			cells.append(origin + Vector2i(dx, dy))
+	for i in range(-reach, reach + 1):
+		cells.append(Vector2i(origin.x + i, origin.y))
 	return cells
 
-func _pierce(origin: Vector2i) -> Array:
+func _line_v(origin: Vector2i, reach: int) -> Array:
 	var cells = []
-	for x in range(BossGrid.placement_cols):
-		cells.append(Vector2i(x, origin.y))
+	for i in range(-reach, reach + 1):
+		cells.append(Vector2i(origin.x, origin.y + i))
 	return cells
 
-func _bounce(origin: Vector2i) -> Array:
+func _x_diag(origin: Vector2i, reach: int) -> Array:
+	var cells = [origin]
+	for i in range(1, reach + 1):
+		cells.append(origin + Vector2i(i, i))
+		cells.append(origin + Vector2i(i, -i))
+		cells.append(origin + Vector2i(-i, i))
+		cells.append(origin + Vector2i(-i, -i))
+	return cells
+
+func _bounce(origin: Vector2i, lvl: int = 1) -> Array:
 	var cells = []
 	var pos = origin
 	var dir = Vector2i(1, 0)
 	var bounces = 0
-	while cells.size() < 20 and bounces < 4:
+	var max_bounces = 1 + lvl
+	var max_cells = 8 + 4 * lvl
+	while cells.size() < max_cells and bounces < max_bounces:
 		if not cells.has(pos):
 			cells.append(pos)
 		var next = pos + dir

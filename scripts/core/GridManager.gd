@@ -14,6 +14,7 @@ var bomb_count: int = 8
 
 var grid: Array = []
 var _grid_generated: bool = false
+var is_magic_reveal: bool = false  # 透视升级触发时为true，用于动画区分
 
 enum CellState { HIDDEN, REVEALED }
 
@@ -117,6 +118,7 @@ func reset_for_new_floor():
 
 func reveal_area(cx: int, cy: int, radius: int = 1):
 	# 透视：强制揭示以(cx,cy)为中心的radius格范围（不扣点击次数）
+	is_magic_reveal = true
 	for dy in range(-radius, radius + 1):
 		for dx in range(-radius, radius + 1):
 			var nx = cx + dx
@@ -131,3 +133,4 @@ func reveal_area(cx: int, cy: int, radius: int = 1):
 				GameManager.add_bomb(cell["bomb_type"])
 				bomb_found.emit(nx, ny, cell["bomb_type"])
 			grid_revealed.emit(nx, ny, cell)
+	is_magic_reveal = false

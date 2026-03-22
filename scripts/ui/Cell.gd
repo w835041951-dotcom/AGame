@@ -95,7 +95,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			_apply_style(C_EMPTY, Color(0.28, 0.26, 0.24), 1)
 
 		DisplayState.BOMB_PLACED:
-			var bomb_type = extra.get("bomb_type", "cross")
+			var bomb_type = extra.get("bomb_type", "pierce_h")
 			var info = BombRegistry.get_bomb_info(bomb_type)
 			var col = info.get("color", Color.RED)
 			_apply_style(col.darkened(0.5), col, 2)
@@ -129,10 +129,8 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			_apply_style(C_BOSS_DEAD, Color(0.3, 0.3, 0.3), 1)
-			modulate = Color(0.3, 0.3, 0.3, 0.7)
-			disabled = true
-			return  # 跳过下面的 modulate 重置
+			_apply_style(C_BOSS_DEAD, Color(0.25, 0.22, 0.22), 1)
+			modulate = Color(0.35, 0.3, 0.3, 0.5)
 
 		DisplayState.EXPLODING:
 			_apply_style(C_EXPLODING, Color(1.0, 0.65, 0.0), 3)
@@ -156,7 +154,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 				add_theme_color_override("font_disabled_color", Color(0,0,0,0))
 
 		DisplayState.MINE_BOMB:
-			var bomb_type = extra.get("bomb_type", "cross")
+			var bomb_type = extra.get("bomb_type", "pierce_h")
 			var info = BombRegistry.get_bomb_info(bomb_type)
 			var col = info.get("color", Color.RED)
 			_apply_style(col.darkened(0.35), col.lightened(0.1), 2)
@@ -219,12 +217,12 @@ func _show_boss_info(extra: Dictionary):
 
 func _bomb_symbol(bomb_type: String) -> String:
 	match bomb_type:
-		"cross":   return "+"
-		"scatter": return "*"
-		"bounce":  return "~"
-		"pierce":  return "|"
-		"area":    return "#"
-		_:         return "!"
+		"pierce_h": return "↔"
+		"pierce_v": return "↕"
+		"cross":    return "+"
+		"x_shot":   return "╳"
+		"bounce":   return "~"
+		_:           return "!"
 
 func _flash_explode():
 	var tween = create_tween()
