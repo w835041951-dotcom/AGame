@@ -3,7 +3,7 @@
 extends Button
 
 enum Mode { PLACEMENT, MINE }
-enum DisplayState { EMPTY, BOMB_PLACED, BLOCKED, BOSS_NORMAL, BOSS_WEAK, BOSS_ARMOR, BOSS_ABSORB, BOSS_DEAD, EXPLODING, MINE_HIDDEN, MINE_REVEALED, MINE_BOMB }
+enum DisplayState { EMPTY, BOMB_PLACED, BLOCKED, BOSS_NORMAL, BOSS_WEAK, BOSS_ARMOR, BOSS_ABSORB, BOSS_DEAD, EXPLODING, MINE_HIDDEN, MINE_REVEALED, MINE_BOMB, MINION }
 
 const SIZE = 64  # 默认值，运行时由 setup() 覆盖
 var cell_size: int = 64
@@ -12,25 +12,6 @@ var mode: Mode = Mode.PLACEMENT
 var grid_x: int
 var grid_y: int
 var _current_state: DisplayState = DisplayState.EMPTY
-
-const C_EMPTY       = Color(0.18, 0.17, 0.20)   # 暗黑地牢地板
-const C_BOSS_DEAD   = Color(0.06, 0.06, 0.07)   # 虚空黑
-const C_MINE_HIDDEN = Color(0.25, 0.26, 0.30)   # 神秘石砖
-const C_MINE_REVEAL = Color(0.58, 0.54, 0.44)   # 温暖砂岩
-const C_EXPLODING   = Color(0.90, 0.35, 0.05)   # 岩浆橙
-
-# 数字颜色：在浅色翻开背景上清晰可读（用深色/饱和色）
-const NUMBER_COLORS = [
-	Color(0.2, 0.2, 0.2),       # 0 不显示
-	Color(0.15, 0.35, 0.80),    # 1 蓝宝石
-	Color(0.12, 0.55, 0.22),    # 2 翡翠绿
-	Color(0.80, 0.15, 0.12),    # 3 红宝石
-	Color(0.22, 0.15, 0.62),    # 4 紫水晶
-	Color(0.62, 0.12, 0.12),    # 5 暗红宝石
-	Color(0.12, 0.50, 0.55),    # 6 绿松石
-	Color(0.88, 0.72, 0.18),    # 7 金色
-	Color(0.55, 0.38, 0.18),    # 8 古铜色
-]
 
 static var _bomb_textures: Dictionary = {}
 static var _boss_textures: Dictionary = {}  # path -> Texture2D
@@ -71,7 +52,7 @@ func _update_mark_display():
 	if _marked_safe:
 		text = "○"
 		add_theme_font_size_override("font_size", 24)
-		add_theme_color_override("font_color", Color(0.35, 0.90, 0.55))
+		add_theme_color_override("font_color", UIThemeManager.get("text_heal"))
 	else:
 		text = ""
 		remove_theme_color_override("font_color")
@@ -92,9 +73,11 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 	remove_theme_color_override("font_disabled_color")
 	add_theme_font_size_override("font_size", 20)
 
+	var tm = UIThemeManager
+
 	match state:
 		DisplayState.EMPTY:
-			_apply_style(C_EMPTY, Color(0.28, 0.26, 0.24), 1)
+			_apply_style(tm.get("bg_empty"), tm.get("border_default"), 1)
 
 		DisplayState.BOMB_PLACED:
 			var bomb_type = extra.get("bomb_type", "pierce_h")
@@ -103,30 +86,28 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			_apply_style(col.darkened(0.5), col, 2)
 			icon = _get_bomb_texture(bomb_type)
 			expand_icon = true
-			# 悬停提示：显示炸弹等级和范围
 			var lvl = BombRegistry.get_bomb_level(bomb_type)
 			var range_desc = BombRegistry.get_range_description(bomb_type)
 			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), lvl, range_desc]
 
 		DisplayState.BLOCKED:
-			_apply_style(Color(0.22, 0.05, 0.05), Color(0.65, 0.15, 0.15), 2)
+			_apply_style(Color(0.22, 0.05, 0.05), tm.get("text_danger").darkened(0.35), 2)
 			text = "✕"
-			add_theme_color_override("font_color", Color(0.65, 0.15, 0.15))
+			add_theme_color_override("font_color", tm.get("text_danger"))
 			disabled = true
 
 		DisplayState.BOSS_NORMAL, DisplayState.BOSS_WEAK, DisplayState.BOSS_ARMOR, DisplayState.BOSS_ABSORB:
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			var border_col = Color(0.65, 0.18, 0.12)
+			var border_col = tm.get("text_danger").darkened(0.2)
 			var border_w = 1
 			match state:
-				DisplayState.BOSS_WEAK:   border_col = Color(0.95, 0.80, 0.15); border_w = 3
-				DisplayState.BOSS_ARMOR:  border_col = Color(0.45, 0.55, 0.85); border_w = 3
-				DisplayState.BOSS_ABSORB: border_col = Color(0.20, 0.75, 0.35); border_w = 2
+				DisplayState.BOSS_WEAK:   border_col = tm.get("boss_weak_brd");   border_w = 3
+				DisplayState.BOSS_ARMOR:  border_col = tm.get("boss_armor_brd");  border_w = 3
+				DisplayState.BOSS_ABSORB: border_col = tm.get("boss_absorb_brd"); border_w = 2
 			_apply_style(Color(0,0,0,0), border_col, border_w)
 			_show_boss_info(extra)
-			# HP 比率（用于底部血条）
 			var hp = extra.get("hp", -1)
 			var max_hp = extra.get("max_hp", 1)
 			_hp_ratio = float(hp) / max(max_hp, 1) if hp >= 0 else -1.0
@@ -136,29 +117,28 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			_apply_style(C_BOSS_DEAD, Color(0.25, 0.22, 0.22), 1)
+			_apply_style(tm.get("bg_void"), tm.get("bg_secondary"), 1)
 			modulate = Color(0.35, 0.3, 0.3, 0.5)
 			_hp_ratio = -1.0
 			queue_redraw()
 
 		DisplayState.EXPLODING:
-			_apply_style(C_EXPLODING, Color(1.0, 0.65, 0.0), 3)
+			_apply_style(tm.get("explode_bg"), tm.get("explode_brd"), 3)
 			_flash_explode()
 
 		DisplayState.MINE_HIDDEN:
-			_apply_style(C_MINE_HIDDEN, Color(0.33, 0.35, 0.40), 2)
+			_apply_style(tm.get("mine_hidden"), tm.get("mine_hidden_brd"), 2)
 
 		DisplayState.MINE_REVEALED:
-			_apply_style(C_MINE_REVEAL, Color(0.48, 0.44, 0.36), 1)
+			_apply_style(tm.get("mine_reveal"), tm.get("mine_reveal_brd"), 1)
 			disabled = true
 			var adj = extra.get("adjacent", 0)
 			if adj > 0:
 				text = str(adj)
-				var nc = NUMBER_COLORS[adj] if adj < NUMBER_COLORS.size() else Color(0.1, 0.1, 0.1)
+				var nc = tm.get_number_color(adj)
 				add_theme_color_override("font_color", nc)
 				add_theme_color_override("font_disabled_color", nc)
 			else:
-				# 空格，强制字色为透明（不显示任何字）
 				add_theme_color_override("font_color", Color(0,0,0,0))
 				add_theme_color_override("font_disabled_color", Color(0,0,0,0))
 
@@ -176,12 +156,24 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 				var tc = col.lightened(0.5)
 				add_theme_color_override("font_color", tc)
 				add_theme_color_override("font_disabled_color", tc)
-			# 悬停提示
 			var mine_lvl = BombRegistry.get_bomb_level(bomb_type)
 			var mine_range = BombRegistry.get_range_description(bomb_type)
 			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), mine_lvl, mine_range]
 			if extra.get("revealed", false):
 				disabled = true
+
+		DisplayState.MINION:
+			var minion_color = extra.get("color", Color(0.4, 0.9, 0.3))
+			var label_text = extra.get("label", "怪")
+			_apply_style(minion_color.darkened(0.6), minion_color, 3)
+			text = label_text.substr(0, 1)
+			add_theme_font_size_override("font_size", max(14, cell_size / 3))
+			add_theme_color_override("font_color", minion_color.lightened(0.6))
+			var hp = extra.get("hp", -1)
+			var max_hp = extra.get("max_hp", 1)
+			_hp_ratio = float(hp) / max(max_hp, 1) if hp >= 0 else -1.0
+			tooltip_text = "%s  HP: %d/%d" % [label_text, hp, max_hp]
+			queue_redraw()
 
 	modulate = Color.WHITE
 	if _hp_ratio < 0.0:
@@ -190,19 +182,16 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 func _draw():
 	if _hp_ratio < 0.0 or _hp_ratio > 1.0:
 		return
-	# 底部 5px HP 条
 	var bar_h = max(5, cell_size / 12)
 	var bar_y = cell_size - bar_h
-	# 背景
 	draw_rect(Rect2(1, bar_y, cell_size - 2, bar_h), Color(0.05, 0.05, 0.05, 0.85))
-	# 前景
 	var bar_col: Color
 	if _hp_ratio > 0.6:
-		bar_col = Color(0.25, 0.85, 0.3)
+		bar_col = UIThemeManager.get("text_heal")
 	elif _hp_ratio > 0.3:
 		bar_col = Color(0.95, 0.75, 0.1)
 	else:
-		bar_col = Color(0.90, 0.15, 0.1)
+		bar_col = UIThemeManager.get("text_danger")
 	var fill_w = int((cell_size - 2) * _hp_ratio)
 	if fill_w > 0:
 		draw_rect(Rect2(1, bar_y, fill_w, bar_h), bar_col)
@@ -227,11 +216,11 @@ func _get_boss_cell_texture(local_pos: Vector2i) -> AtlasTexture:
 	var tex = _boss_textures[tex_path]
 	if tex == null:
 		return null
-	# 根据贴图实际尺寸和Boss包围盒大小动态计算每格像素大小
+	if BossGrid.boss_width <= 0 or BossGrid.boss_height <= 0:
+		return null
 	var tile_w = int(tex.get_width()  / float(BossGrid.boss_width))
 	var tile_h = int(tex.get_height() / float(BossGrid.boss_height))
 	var region = Rect2(local_pos.x * tile_w, local_pos.y * tile_h, tile_w, tile_h)
-	# 安全检查：不超出贴图边界
 	if region.position.x + tile_w > tex.get_width() or region.position.y + tile_h > tex.get_height():
 		return null
 	var atlas = AtlasTexture.new()
@@ -246,7 +235,7 @@ func _show_boss_info(extra: Dictionary):
 		BossGrid.BodyPart.LEG:  text = "L"
 		BossGrid.BodyPart.CORE: text = "C"
 	if text != "":
-		add_theme_color_override("font_color", Color(0.95, 0.88, 0.50))
+		add_theme_color_override("font_color", UIThemeManager.get("text_accent"))
 
 func _bomb_symbol(bomb_type: String) -> String:
 	match bomb_type:
@@ -258,8 +247,10 @@ func _bomb_symbol(bomb_type: String) -> String:
 		_:           return "!"
 
 func _flash_explode():
+	var c_start = UIThemeManager.get("explode_bg")
+	var c_end   = UIThemeManager.get("bg_empty")
 	var tween = create_tween()
-	tween.tween_method(func(c): _apply_style(c, Color.YELLOW, 3), C_EXPLODING, C_EMPTY, 0.5)
+	tween.tween_method(func(c): _apply_style(c, Color.YELLOW, 3), c_start, c_end, 0.5)
 
 # ---- 动画方法 ----
 
@@ -290,10 +281,9 @@ func animate_reveal():
 	tween.tween_property(self, "scale", Vector2.ONE, 0.15)
 
 func animate_magic_reveal():
-	# 透视升级专用动画：紫色光晕 + 旋转缩放
 	pivot_offset = size / 2
 	scale = Vector2(0.0, 0.0)
-	modulate = Color(0.6, 0.3, 1.0, 0.0)  # 紫色透明
+	modulate = Color(0.6, 0.3, 1.0, 0.0)
 	var tween = create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
@@ -301,20 +291,20 @@ func animate_magic_reveal():
 	tween.tween_property(self, "rotation", TAU, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await tween.finished
 	rotation = 0.0
-	# 从紫色过渡到正常白色
 	var tw2 = create_tween()
 	tw2.tween_property(self, "modulate", Color.WHITE, 0.3)
 
 func animate_boss_pulse():
+	var c = UIThemeManager.get("boss_pulse")
 	var tween = create_tween()
-	tween.tween_property(self, "modulate", Color(1.3, 1.1, 1.0), 0.05)
+	tween.tween_property(self, "modulate", c, 0.05)
 	tween.tween_property(self, "modulate", Color.WHITE, 0.25)
 
 func animate_chain():
-	# 连锁炸弹蓝色脉冲（表示被连锁引爆）
+	var c = UIThemeManager.get("chain_flash")
 	pivot_offset = size / 2
 	var tween = create_tween().set_parallel(true)
-	tween.tween_property(self, "modulate", Color(0.5, 0.8, 2.5), 0.08)
+	tween.tween_property(self, "modulate", c, 0.08)
 	tween.tween_property(self, "scale", Vector2(1.25, 1.25), 0.08)
 	var tw2 = create_tween().set_parallel(true)
 	tw2.tween_interval(0.08)
@@ -322,17 +312,12 @@ func animate_chain():
 	tw2.tween_property(self, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _apply_style(bg: Color, border: Color, border_w: int):
+	var cr = UIThemeManager.get("corner_radius") as int
 	var s = StyleBoxFlat.new()
 	s.bg_color = bg
-	s.border_width_left = border_w
-	s.border_width_right = border_w
-	s.border_width_top = border_w
-	s.border_width_bottom = border_w
+	s.set_border_width_all(border_w)
 	s.border_color = border
-	s.corner_radius_top_left = 3
-	s.corner_radius_top_right = 3
-	s.corner_radius_bottom_left = 3
-	s.corner_radius_bottom_right = 3
+	s.set_corner_radius_all(cr)
 	s.shadow_color = Color(0, 0, 0, 0.35)
 	s.shadow_size = 2
 	add_theme_stylebox_override("normal", s)

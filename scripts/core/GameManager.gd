@@ -137,6 +137,7 @@ func next_floor():
 	triggered_thresholds.clear()
 	# bomb_inventory 保留，炸弹可以带入下一关
 	max_clicks = LevelData.get_max_clicks(floor_number)
+	current_clicks = max_clicks  # 重置点击数，防止跨关残留
 	turn_duration = LevelData.get_turn_duration(floor_number)
 	GridManager.reset_for_new_floor()
 	# boss_hp 由 BossGrid.setup() 后 sync_boss_hp() 设置
