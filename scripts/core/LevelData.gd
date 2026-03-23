@@ -497,6 +497,33 @@ func get_boss_texture_path(floor_number: int) -> String:
 	var key = get_level(floor_number)["boss_shape"]
 	return BOSS_TEXTURE_MAP[key]
 
+const BACKGROUND_PATHS: Array = [
+	"res://assets/sprites/bg/bg_stone_prison.png",     # floor 1
+	"res://assets/sprites/bg/bg_bone_chamber.png",     # floor 2
+	"res://assets/sprites/bg/bg_lava_cave.png",        # floor 3
+	"res://assets/sprites/bg/bg_ghost_wreck.png",      # floor 4
+	"res://assets/sprites/bg/bg_crystal_cavern.png",   # floor 5
+	"res://assets/sprites/bg/bg_ancient_ruins.png",    # floor 6
+	"res://assets/sprites/bg/bg_shadow_hall.png",      # floor 7
+	"res://assets/sprites/bg/bg_frost_altar.png",      # floor 8
+	"res://assets/sprites/bg/bg_plague_swamp.png",     # floor 9
+	"res://assets/sprites/bg/bg_mechanical_fort.png",  # floor 10
+	"res://assets/sprites/bg/bg_nightmare_maze.png",   # floor 11
+	"res://assets/sprites/bg/bg_corrupted_temple.png", # floor 12
+	"res://assets/sprites/bg/bg_void_rift.png",        # floor 13
+	"res://assets/sprites/bg/bg_thunder_peak.png",     # floor 14
+	"res://assets/sprites/bg/bg_shadow_realm.png",     # floor 15
+	"res://assets/sprites/bg/bg_chaos_forge.png",      # floor 16
+	"res://assets/sprites/bg/bg_void_palace.png",      # floor 17
+	"res://assets/sprites/bg/bg_divine_sanctum.png",   # floor 18
+	"res://assets/sprites/bg/bg_abyss_throne.png",     # floor 19
+	"res://assets/sprites/bg/bg_final_sanctum.png",    # floor 20
+]
+
+func get_background_texture_path(floor_number: int) -> String:
+	var idx = ((floor_number - 1) % BACKGROUND_PATHS.size())
+	return BACKGROUND_PATHS[idx]
+
 func get_cell_size(floor_number: int) -> int:
 	var p_cols = get_placement_cols(floor_number)
 	var p_rows = get_placement_rows(floor_number)
