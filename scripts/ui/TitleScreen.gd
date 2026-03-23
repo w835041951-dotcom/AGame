@@ -1,5 +1,5 @@
 ## 标题界面 - 新游戏/继续/设置/退出
-## 包含背景动画、菜单选项
+## 包含背景动画、菜单选项、视觉主题选择
 
 extends Control
 
@@ -11,7 +11,8 @@ const TITLE_BG = "res://assets/sprites/ui/title_bg.png"
 var _menu_items: Array = []
 var _selected:   int   = 0
 var _can_input:  bool  = false
-var _has_save:   bool  = false  # 是否有存档（目前简化为false）
+var _has_save:   bool  = false
+var _theme_btns: Array = []
 
 func _ready():
 	_setup_scene()
@@ -25,7 +26,7 @@ func _animate_in():
 	tw.tween_callback(func(): _can_input = true)
 	await tw.finished
 
-# ─── 场景构建（在 _ready 调用）───────────────────────────────
+# ─── 场景构建 ────────────────────────────────────────────────
 
 func _setup_scene():
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -36,20 +37,14 @@ func _setup_scene():
 	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	if ResourceLoader.exists(TITLE_BG):
 		bg.texture = load(TITLE_BG)
-	bg.modulate = Color(0.6, 0.55, 0.5)  # 稍微压暗让文字清晰
+	bg.modulate = Color(0.6, 0.55, 0.5)
 	add_child(bg)
 
-	# ── 像素风暗色遮罩 ──
+	# ── 暗色遮罩 ──
 	var overlay = ColorRect.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.color = Color(0.0, 0.0, 0.02, 0.55)
 	add_child(overlay)
-
-	# ── 扫描线效果 ──
-	var scanlines = ColorRect.new()
-	scanlines.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scanlines.color = Color(0, 0, 0, 0)  # 实际扫描线用 shader 更好，这里跳过
-	add_child(scanlines)
 
 	# ── 标题文字 ──
 	var title_lbl = Label.new()
@@ -66,7 +61,7 @@ func _setup_scene():
 	add_child(title_lbl)
 
 	var sub_lbl = Label.new()
-	sub_lbl.text = "BOMBER DUNGEON  100 FLOORS"
+	sub_lbl.text = "BOMBER DUNGEON  300 FLOORS"
 	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	sub_lbl.position = Vector2(0, 168)
@@ -75,15 +70,17 @@ func _setup_scene():
 	sub_lbl.add_theme_color_override("font_color", Color(0.65, 0.55, 0.35))
 	add_child(sub_lbl)
 
+	# ── 主题选择区 ──
+	_build_theme_selector()
+
 	# ── 菜单容器 ──
 	var menu_vbox = VBoxContainer.new()
 	menu_vbox.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	menu_vbox.position = Vector2(1920 / 2.0 - 180, 340)
+	menu_vbox.position = Vector2(1920 / 2.0 - 180, 380)
 	menu_vbox.size = Vector2(360, 280)
 	menu_vbox.add_theme_constant_override("separation", 16)
 	add_child(menu_vbox)
 
-	# 菜单项定义
 	var items_def = [
 		{"id": "story",    "label": "▶  观看故事",  "enabled": true},
 		{"id": "new_game", "label": "⚔  新游戏",    "enabled": true},
@@ -124,8 +121,144 @@ func _setup_scene():
 	hint_lbl.add_theme_color_override("font_color", Color(0.55, 0.50, 0.40))
 	add_child(hint_lbl)
 
-	# ── 背景粒子（简单跳动的炸弹符号）──
 	_start_bg_animation(title_lbl)
+
+# ─── 主题选择区 ──────────────────────────────────────────────
+
+const THEME_DEFS = [
+	{
+		"id": UIThemeManager.Theme.DUNGEON,
+		"name": "暗黑地牢",
+		"desc": "古老石窟\n炙热熔金",
+		"accent": Color(0.95, 0.75, 0.20),
+		"bg":     Color(0.12, 0.10, 0.08),
+		"brd":    Color(0.55, 0.40, 0.15),
+	},
+	{
+		"id": UIThemeManager.Theme.CYBER,
+		"name": "赛博朋克",
+		"desc": "霓虹数据\n电磁脉冲",
+		"accent": Color(0.0,  0.95, 0.85),
+		"bg":     Color(0.04, 0.06, 0.14),
+		"brd":    Color(0.0,  0.75, 0.90),
+	},
+	{
+		"id": UIThemeManager.Theme.PIXEL,
+		"name": "像素复古",
+		"desc": "8-bit像素\n复古光荣",
+		"accent": Color(0.95, 0.88, 0.25),
+		"bg":     Color(0.10, 0.12, 0.08),
+		"brd":    Color(0.65, 0.58, 0.18),
+	},
+]
+
+func _build_theme_selector():
+	# 标签
+	var lbl = Label.new()
+	lbl.text = "视觉风格"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, 228)
+	lbl.size = Vector2(1920, 32)
+	lbl.add_theme_font_size_override("font_size", 18)
+	lbl.add_theme_color_override("font_color", Color(0.65, 0.58, 0.40, 0.9))
+	add_child(lbl)
+
+	# 三个卡片排列，居中，每张 260×90
+	var card_w = 260
+	var card_h = 90
+	var gap    = 24
+	var total_w = card_w * 3 + gap * 2
+	var start_x = (1920 - total_w) / 2.0
+	var card_y  = 265.0
+
+	_theme_btns.clear()
+	for i in range(THEME_DEFS.size()):
+		var tdef = THEME_DEFS[i]
+		var btn = _make_theme_card(tdef, card_w, card_h, i == UIThemeManager.current_theme)
+		btn.position = Vector2(start_x + i * (card_w + gap), card_y)
+		btn.set_meta("theme_id", tdef["id"])
+		btn.pressed.connect(func():
+			UIThemeManager.set_theme(btn.get_meta("theme_id"))
+			_refresh_theme_cards()
+			AudioManager.play_sfx("ui_click")
+		)
+		add_child(btn)
+		_theme_btns.append(btn)
+
+func _make_theme_card(tdef: Dictionary, w: int, h: int, selected: bool) -> Button:
+	var btn = Button.new()
+	btn.custom_minimum_size = Vector2(w, h)
+	btn.size = Vector2(w, h)
+
+	var s = StyleBoxFlat.new()
+	s.bg_color = tdef["bg"]
+	s.border_color = tdef["brd"] if not selected else tdef["accent"]
+	s.set_border_width_all(3 if selected else 2)
+	s.set_corner_radius_all(6)
+	s.shadow_color = (tdef["accent"] as Color).darkened(0.3)
+	s.shadow_size = 6 if selected else 1
+	btn.add_theme_stylebox_override("normal", s)
+	var h_style = s.duplicate()
+	h_style.border_color = tdef["accent"]
+	h_style.set_border_width_all(3)
+	btn.add_theme_stylebox_override("hover", h_style)
+	btn.add_theme_stylebox_override("pressed", h_style)
+
+	# 名字
+	var name_lbl = Label.new()
+	name_lbl.text = tdef["name"]
+	name_lbl.position = Vector2(8, 8)
+	name_lbl.size = Vector2(w - 16, 32)
+	name_lbl.add_theme_font_size_override("font_size", 20)
+	name_lbl.add_theme_color_override("font_color", tdef["accent"])
+	btn.add_child(name_lbl)
+
+	# 描述
+	var desc_lbl = Label.new()
+	desc_lbl.text = tdef["desc"]
+	desc_lbl.position = Vector2(8, 42)
+	desc_lbl.size = Vector2(w - 16, 44)
+	desc_lbl.add_theme_font_size_override("font_size", 13)
+	desc_lbl.add_theme_color_override("font_color", (tdef["accent"] as Color).darkened(0.15))
+	btn.add_child(desc_lbl)
+
+	# 选中指示点
+	if selected:
+		var dot = Label.new()
+		dot.text = "●"
+		dot.position = Vector2(w - 26, 6)
+		dot.size = Vector2(20, 20)
+		dot.add_theme_font_size_override("font_size", 14)
+		dot.add_theme_color_override("font_color", tdef["accent"])
+		btn.add_child(dot)
+
+	return btn
+
+func _refresh_theme_cards():
+	for i in range(_theme_btns.size()):
+		_theme_btns[i].queue_free()
+	_theme_btns.clear()
+	# 重建卡片
+	var card_w = 260
+	var card_h = 90
+	var gap    = 24
+	var total_w = card_w * 3 + gap * 2
+	var start_x = (1920 - total_w) / 2.0
+	var card_y  = 265.0
+	for i in range(THEME_DEFS.size()):
+		var tdef = THEME_DEFS[i]
+		var btn = _make_theme_card(tdef, card_w, card_h, i == UIThemeManager.current_theme)
+		btn.position = Vector2(start_x + i * (card_w + gap), card_y)
+		btn.set_meta("theme_id", tdef["id"])
+		btn.pressed.connect(func():
+			UIThemeManager.set_theme(btn.get_meta("theme_id"))
+			_refresh_theme_cards()
+			AudioManager.play_sfx("ui_click")
+		)
+		add_child(btn)
+		_theme_btns.append(btn)
+
+# ─── 菜单按钮 ────────────────────────────────────────────────
 
 func _make_menu_btn(label_text: String) -> Button:
 	var btn = Button.new()
@@ -175,7 +308,6 @@ func _update_selection(idx: int):
 		btn.add_theme_stylebox_override("normal", s)
 
 func _start_bg_animation(title_lbl: Label):
-	# 标题脉冲
 	var pulse = create_tween().set_loops()
 	pulse.tween_property(title_lbl, "modulate:v", 0.85, 1.4)
 	pulse.tween_property(title_lbl, "modulate:v", 1.0,  1.4)

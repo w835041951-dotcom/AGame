@@ -21,9 +21,11 @@ config/icon="res://icon.svg"
 GameManager="*res://scripts/core/GameManager.gd"
 GridManager="*res://scripts/core/GridManager.gd"
 BombRegistry="*res://scripts/bombs/BombRegistry.gd"
+UIThemeManager="*res://scripts/core/UIThemeManager.gd"
 BossGrid="*res://scripts/boss/BossGrid.gd"
 BombPlacer="*res://scripts/boss/BombPlacer.gd"
 ExplosionCalc="*res://scripts/boss/ExplosionCalc.gd"
+MinionGrid="*res://scripts/boss/MinionGrid.gd"
 UpgradeManager="*res://scripts/core/UpgradeManager.gd"
 AudioManager="*res://scenes/core/AudioManager.tscn"
 LevelData="*res://scripts/core/LevelData.gd"
@@ -33,7 +35,6 @@ LevelData="*res://scripts/core/LevelData.gd"
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
 [rendering]
 

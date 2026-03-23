@@ -170,7 +170,8 @@ func move_left():
 func random_move():
 	# 高层有概率触发特殊移动
 	var floor_n = GameManager.floor_number
-	var charge_chance = min(0.05 * floor_n, 0.35)  # 每层+5%，最高35%
+	var level_idx = LevelData.get_level(floor_n)["id"]
+	var charge_chance = min(0.02 * level_idx, 0.35)  # 每关+2%，最高35%
 	if boss_origin.x > 1 and randf() < charge_chance:
 		# 突进：移动2格
 		boss_origin.x -= 2
@@ -184,13 +185,14 @@ func random_move():
 
 func _choose_attack() -> AttackType:
 	var floor_n = GameManager.floor_number
+	var level_idx = LevelData.get_level(floor_n)["id"]  # 1-20 within cycle
 	# 高层Boss有更强攻击模式
 	var roll = randf()
-	if floor_n >= 5 and roll < 0.25:
+	if level_idx >= 15 and roll < 0.25:
 		return AttackType.WIDE_SWIPE   # 横扫：对玩家造成AOE伤害
-	elif floor_n >= 3 and roll < 0.45:
+	elif level_idx >= 8 and roll < 0.45:
 		return AttackType.SLAM         # 重击：造成双倍伤害
-	elif floor_n >= 2 and roll < 0.60:
+	elif level_idx >= 4 and roll < 0.60:
 		return AttackType.CHARGE       # 突进：造成1.5x伤害
 	return AttackType.NORMAL
 

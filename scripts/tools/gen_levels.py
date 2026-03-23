@@ -1,4 +1,11 @@
-## 关卡数据 - AutoLoad
+"""
+Generate LevelData.gd — 20 unique bosses × 5 cycles = 100 floors
+"""
+import os
+
+OUT = os.path.join(os.path.dirname(__file__), "..", "core", "LevelData.gd")
+
+CONTENT = r'''## 关卡数据 - AutoLoad
 ## 20个主题关卡 × 5周期 = 100层
 ## 每种Boss独立形状、配色、棋盘大小、探索区参数
 ## 周期递增：HP倍率、攻击力、移动速度、棋盘扩展
@@ -540,3 +547,11 @@ func get_max_clicks(floor_number: int) -> int:
 	var level = get_level(floor_number)
 	var cycle = get_cycle(floor_number)
 	return level["base_clicks"] + cycle * 3
+'''
+
+with open(OUT, 'w', encoding='utf-8') as f:
+    f.write(CONTENT.lstrip('\n'))
+
+print(f"Generated {OUT}")
+print(f"  20 levels × 5 cycles = 100 floors")
+print(f"  20 unique boss shapes")

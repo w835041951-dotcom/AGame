@@ -121,6 +121,22 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 			for i in range(hits.size()):
 				hits[i] *= bonus_mult
 
+	# 步骤3.5: 小怪伤害（小怪在Boss前处理）
+	var minion_damages: Dictionary = {}
+	for cell in all_blast_cells:
+		if MinionGrid.is_minion_tile(cell):
+			# 计算此格总伤害（取独立估算：所有命中此格的炸弹平均基础伤害）
+			var total_hit = 0.0
+			for bomb_pos in placed_bombs:
+				var blast = get_blast_cells(bomb_pos, placed_bombs[bomb_pos])
+				if cell in blast:
+					var dmg_mult2 = UpgradeManager.get_combat_dmg_mult()
+					total_hit += float(BombRegistry.calculate_damage(placed_bombs[bomb_pos])) * dmg_mult2 * (1.0 + chain_bonus.get(bomb_pos, 0.0))
+			var minion_dmg = int(total_hit)
+			if minion_dmg > 0:
+				minion_damages[cell] = minion_dmg
+				MinionGrid.apply_damage(cell, minion_dmg)
+
 	# 步骤4: 逐格写入伤害（类型修正在 BossGrid 内部处理）
 	var total_damage = 0
 	var cell_damages: Dictionary = {}  # 用于浮动数字
@@ -132,6 +148,10 @@ func resolve_all(placed_bombs: Dictionary) -> int:
 		total_damage += final_dmg
 		cell_damages[cell] = final_dmg
 		BossGrid.apply_damage_to_tile(cell, final_dmg)
+	# 合并小怪伤害数字显示
+	for cell in minion_damages:
+		if not cell_damages.has(cell):
+			cell_damages[cell] = minion_damages[cell]
 
 	# 步骤5: 同步总HP + 检查升级阈值
 	GameManager.sync_boss_hp()

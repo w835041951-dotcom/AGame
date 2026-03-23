@@ -18,6 +18,8 @@ func _ready():
 	GameManager.turn_started.connect(_on_turn_started)
 	ExplosionCalc.explosion_visual.connect(_on_explosion_visual)
 	ExplosionCalc.chain_triggered.connect(_on_chain_triggered)
+	MinionGrid.minions_refreshed.connect(_refresh_minion_tiles)
+	MinionGrid.minion_defeated.connect(_on_minion_defeated)
 
 func _on_turn_started():
 	_build_grid()
@@ -50,7 +52,12 @@ func _refresh_boss_tiles():
 				continue  # 已放炸弹的格子不覆盖
 			cells[y][x].set_display_state(Cell.DisplayState.EMPTY)
 
-	# 渲染 Boss 格子
+	# 渲染小怪格子（优先级高于Boss）
+	_refresh_minion_tiles()
+
+	# 渲染 Boss 格子（若在小怪阶段，Boss格子不可见——Boss未入场）
+	if MinionGrid.has_minions():
+		return
 	for local_pos in BossGrid.tiles:
 		var tile = BossGrid.tiles[local_pos]
 		var world = BossGrid.local_to_world(local_pos)
@@ -58,11 +65,38 @@ func _refresh_boss_tiles():
 			continue
 		if world.y < 0 or world.y >= BossGrid.placement_rows:
 			continue
+		if BombPlacer.placed_bombs.has(world):
+			continue
 		var state = _tile_state(tile)
 		cells[world.y][world.x].set_display_state(state, {
 			"hp": tile["hp"], "max_hp": tile["max_hp"], "part": tile["part"],
 			"local_pos": local_pos
 		})
+
+func _refresh_minion_tiles():
+	if cells.is_empty():
+		return
+	for world_pos in MinionGrid.minion_tiles:
+		var tile = MinionGrid.minion_tiles[world_pos]
+		if not tile["alive"]:
+			continue
+		if world_pos.y < 0 or world_pos.y >= cells.size():
+			continue
+		if world_pos.x < 0 or world_pos.x >= cells[world_pos.y].size():
+			continue
+		if BombPlacer.placed_bombs.has(world_pos):
+			continue
+		cells[world_pos.y][world_pos.x].set_display_state(Cell.DisplayState.MINION, {
+			"hp": tile["hp"], "max_hp": tile["max_hp"],
+			"label": tile["label"], "color": tile["color"]
+		})
+
+func _on_minion_defeated(world_pos: Vector2i, _drop_type: String):
+	if world_pos.y >= 0 and world_pos.y < cells.size() and world_pos.x >= 0 and world_pos.x < cells[world_pos.y].size():
+		cells[world_pos.y][world_pos.x].animate_destruction()
+		await get_tree().create_timer(0.25).timeout
+		if world_pos.y < cells.size() and world_pos.x < cells[world_pos.y].size():
+			cells[world_pos.y][world_pos.x].set_display_state(Cell.DisplayState.EMPTY)
 
 func _tile_state(tile: Dictionary) -> Cell.DisplayState:
 	if not tile["alive"]:

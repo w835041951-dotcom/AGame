@@ -1,10 +1,9 @@
 """
-Boss 像素艺术生成器 v4 — 每种Boss独立纹理
-按形状大小生成：石像鬼3x3, 影蛛5x3, 熔岩巨蛇4x4, 骸骨巨人5x5, 深渊魔王6x4
+Boss 像素艺术生成器 v5 — 20种Boss独立纹理
 每个Boss一张atlas贴图，Cell.gd按local坐标裁切
 """
 import os, math, random
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageChops
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites", "boss")
 os.makedirs(OUT, exist_ok=True)
@@ -14,11 +13,12 @@ CELL_PX = 64  # 每格最终像素
 
 random.seed(42)
 
-# ── 5种Boss的配色方案 ──
+# ── 20种Boss的配色方案 ──
 BOSS_CONFIGS = {
+    # --- 第一幕 (1-5) ---
     "gargoyle": {
-        "cols": 3, "rows": 3,
-        "shape": [(0,0),(1,0),(2,0),(0,1),(1,1),(2,1),(0,2),(1,2),(2,2)],
+        "cols": 5, "rows": 4,
+        "shape": [(1,0),(3,0),(1,1),(2,1),(3,1),(1,2),(2,2),(3,2),(2,3)],
         "body":  (72, 78, 85),    # 灰石色
         "dark":  (35, 38, 42),
         "crack": (40, 42, 48),
@@ -50,9 +50,9 @@ BOSS_CONFIGS = {
         "accent":(200, 80, 10),
     },
     "giant": {
-        "cols": 5, "rows": 5,
-        "shape": [(1,0),(2,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),(1,2),(2,2),(3,2),
-                  (0,3),(1,3),(2,3),(3,3),(4,3),(1,4),(2,4),(3,4)],
+        "cols": 7, "rows": 5,
+        "shape": [(2,0),(3,0),(4,0),(1,1),(2,1),(3,1),(4,1),(5,1),(1,2),(2,2),(3,2),(4,2),(5,2),
+                  (0,3),(3,3),(6,3),(1,4),(3,4),(5,4)],
         "body":  (85, 82, 70),    # 骨白色
         "dark":  (42, 40, 35),
         "crack": (50, 48, 42),
@@ -62,9 +62,9 @@ BOSS_CONFIGS = {
         "accent":(160, 140, 80),
     },
     "demon": {
-        "cols": 6, "rows": 4,
-        "shape": [(0,0),(1,0),(4,0),(5,0),(0,1),(1,1),(2,1),(3,1),(4,1),(5,1),
-                  (0,2),(1,2),(2,2),(3,2),(4,2),(5,2),(1,3),(2,3),(3,3),(4,3)],
+        "cols": 6, "rows": 5,
+        "shape": [(0,0),(5,0),(0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(1,2),(2,2),(3,2),(4,2),
+                  (0,3),(1,3),(2,3),(3,3),(4,3),(5,3),(2,4),(3,4)],
         "body":  (80, 25, 20),    # 深渊暗红
         "dark":  (40, 10, 8),
         "crack": (50, 15, 12),
@@ -72,6 +72,196 @@ BOSS_CONFIGS = {
         "eye":   (255, 60, 40),
         "rune":  (220, 30, 20),
         "accent":(180, 20, 15),
+    },
+    # --- 第二幕 (6-10) ---
+    "witch": {
+        "cols": 5, "rows": 5,
+        "shape": [(2,0),(1,1),(2,1),(3,1),(0,2),(1,2),(2,2),(3,2),(4,2),
+                  (1,3),(2,3),(3,3),(2,4)],
+        "body":  (160, 200, 230),  # 冰蓝色
+        "dark":  (60, 80, 110),
+        "crack": (80, 100, 130),
+        "glow":  (100, 200, 255),  # 冰霜光
+        "eye":   (140, 220, 255),
+        "rune":  (80, 180, 240),
+        "accent":(60, 150, 220),
+    },
+    "wyvern": {
+        "cols": 7, "rows": 3,
+        "shape": [(0,0),(3,0),(6,0),(0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),
+                  (1,2),(2,2),(3,2),(4,2),(5,2)],
+        "body":  (35, 80, 65),    # 暗翠绿
+        "dark":  (15, 40, 30),
+        "crack": (25, 50, 40),
+        "glow":  (0, 255, 180),   # 翠光
+        "eye":   (40, 255, 200),
+        "rune":  (0, 220, 150),
+        "accent":(0, 180, 120),
+    },
+    "kraken": {
+        "cols": 5, "rows": 4,
+        "shape": [(0,0),(2,0),(4,0),(1,1),(2,1),(3,1),
+                  (1,2),(2,2),(3,2),(0,3),(2,3),(4,3)],
+        "body":  (25, 40, 70),    # 深海蓝
+        "dark":  (10, 18, 35),
+        "crack": (15, 25, 45),
+        "glow":  (0, 150, 255),   # 深海光
+        "eye":   (40, 180, 255),
+        "rune":  (0, 120, 220),
+        "accent":(0, 100, 190),
+    },
+    "golem": {
+        "cols": 5, "rows": 4,
+        "shape": [(0,0),(1,0),(3,0),(4,0),(1,1),(2,1),(3,1),
+                  (1,2),(2,2),(3,2),(0,3),(1,3),(3,3),(4,3)],
+        "body":  (110, 115, 120),  # 钢铁灰
+        "dark":  (50, 52, 55),
+        "crack": (60, 62, 65),
+        "glow":  (255, 200, 80),   # 熔铁金
+        "eye":   (255, 220, 100),
+        "rune":  (230, 180, 60),
+        "accent":(200, 150, 40),
+    },
+    "wolf": {
+        "cols": 6, "rows": 5,
+        "shape": [(3,0),(2,1),(3,1),(4,1),(0,2),(1,2),(2,2),(3,2),(4,2),(5,2),
+                  (2,3),(3,3),(4,3),(3,4)],
+        "body":  (80, 25, 25),    # 暗血红
+        "dark":  (40, 10, 10),
+        "crack": (50, 15, 15),
+        "glow":  (255, 50, 50),   # 血光
+        "eye":   (255, 80, 60),
+        "rune":  (220, 40, 40),
+        "accent":(180, 30, 30),
+    },
+    # --- 第三幕 (11-15) ---
+    "titan": {
+        "cols": 7, "rows": 5,
+        "shape": [(0,0),(6,0),(0,1),(1,1),(5,1),(6,1),
+                  (0,2),(1,2),(2,2),(3,2),(4,2),(5,2),(6,2),
+                  (0,3),(1,3),(5,3),(6,3),(0,4),(6,4)],
+        "body":  (70, 80, 110),    # 雷暴蓝灰
+        "dark":  (30, 35, 55),
+        "crack": (40, 45, 65),
+        "glow":  (80, 180, 255),   # 电光蓝
+        "eye":   (120, 200, 255),
+        "rune":  (60, 160, 240),
+        "accent":(40, 140, 220),
+    },
+    "mushroom": {
+        "cols": 5, "rows": 5,
+        "shape": [(1,0),(2,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),
+                  (1,2),(2,2),(3,2),(2,3),(1,4),(2,4),(3,4)],
+        "body":  (60, 75, 35),    # 毒绿褐
+        "dark":  (28, 38, 15),
+        "crack": (35, 45, 20),
+        "glow":  (120, 255, 40),  # 毒光绿
+        "eye":   (150, 255, 60),
+        "rune":  (100, 220, 30),
+        "accent":(80, 190, 20),
+    },
+    "crystal": {
+        "cols": 5, "rows": 5,
+        "shape": [(1,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),(1,2),(2,2),(3,2),
+                  (0,3),(1,3),(2,3),(3,3),(4,3),(2,4)],
+        "body":  (40, 100, 110),   # 水晶青
+        "dark":  (15, 45, 50),
+        "crack": (25, 60, 65),
+        "glow":  (0, 255, 220),    # 水晶光
+        "eye":   (60, 255, 240),
+        "rune":  (0, 220, 190),
+        "accent":(0, 190, 160),
+    },
+    "assassin": {
+        "cols": 5, "rows": 5,
+        "shape": [(0,0),(4,0),(0,1),(1,1),(3,1),(4,1),
+                  (1,2),(2,2),(3,2),(0,3),(1,3),(3,3),(4,3),(0,4),(4,4)],
+        "body":  (40, 40, 45),    # 暗影灰
+        "dark":  (18, 18, 22),
+        "crack": (28, 28, 32),
+        "glow":  (200, 50, 255),  # 暗影紫
+        "eye":   (230, 80, 255),
+        "rune":  (180, 40, 230),
+        "accent":(150, 30, 200),
+    },
+    "phoenix": {
+        "cols": 7, "rows": 5,
+        "shape": [(0,0),(6,0),(0,1),(1,1),(5,1),(6,1),
+                  (1,2),(2,2),(3,2),(4,2),(5,2),(2,3),(3,3),(4,3),(3,4)],
+        "body":  (120, 80, 20),    # 火焰金棕
+        "dark":  (60, 35, 8),
+        "crack": (70, 45, 12),
+        "glow":  (255, 200, 40),   # 烈焰金
+        "eye":   (255, 220, 80),
+        "rune":  (255, 180, 30),
+        "accent":(230, 150, 20),
+    },
+    # --- 第四幕 (16-20) ---
+    "lich": {
+        "cols": 6, "rows": 5,
+        "shape": [(1,0),(2,0),(3,0),(4,0),(2,1),(3,1),
+                  (1,2),(2,2),(3,2),(4,2),(2,3),(3,3),
+                  (1,4),(2,4),(3,4),(4,4)],
+        "body":  (40, 60, 35),    # 亡灵绿
+        "dark":  (18, 30, 15),
+        "crack": (25, 38, 20),
+        "glow":  (100, 255, 80),  # 魂火绿
+        "eye":   (130, 255, 100),
+        "rune":  (80, 230, 60),
+        "accent":(60, 200, 40),
+    },
+    "void": {
+        "cols": 5, "rows": 5,
+        "shape": [(0,0),(2,0),(4,0),(1,1),(2,1),(3,1),
+                  (0,2),(1,2),(2,2),(3,2),(4,2),(1,3),(2,3),(3,3),
+                  (0,4),(4,4)],
+        "body":  (50, 20, 70),    # 虚空紫
+        "dark":  (22, 8, 30),
+        "crack": (30, 12, 40),
+        "glow":  (180, 80, 255),  # 虚空光
+        "eye":   (210, 110, 255),
+        "rune":  (160, 60, 230),
+        "accent":(130, 40, 200),
+    },
+    "eagle": {
+        "cols": 8, "rows": 4,
+        "shape": [(0,0),(3,0),(4,0),(7,0),
+                  (0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),(7,1),
+                  (1,2),(2,2),(3,2),(4,2),(5,2),(6,2),(3,3),(4,3)],
+        "body":  (90, 95, 105),    # 暴风灰白
+        "dark":  (40, 42, 48),
+        "crack": (50, 52, 58),
+        "glow":  (200, 220, 255),  # 风暴白光
+        "eye":   (220, 235, 255),
+        "rune":  (180, 200, 240),
+        "accent":(150, 170, 220),
+    },
+    "chaos": {
+        "cols": 7, "rows": 5,
+        "shape": [(0,0),(3,0),(6,0),(1,1),(2,1),(3,1),(4,1),(5,1),
+                  (2,2),(3,2),(4,2),(1,3),(2,3),(3,3),(4,3),(5,3),
+                  (0,4),(3,4),(6,4)],
+        "body":  (65, 15, 15),    # 混沌暗赤
+        "dark":  (30, 5, 5),
+        "crack": (40, 8, 8),
+        "glow":  (255, 40, 60),   # 混沌赤光
+        "eye":   (255, 70, 80),
+        "rune":  (230, 30, 50),
+        "accent":(200, 20, 40),
+    },
+    "enddragon": {
+        "cols": 8, "rows": 4,
+        "shape": [(1,0),(2,0),(5,0),(6,0),
+                  (0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),(7,1),
+                  (1,2),(2,2),(3,2),(4,2),(5,2),(6,2),
+                  (2,3),(3,3),(4,3),(5,3)],
+        "body":  (85, 70, 30),    # 古龙暗金
+        "dark":  (40, 32, 12),
+        "crack": (50, 40, 16),
+        "glow":  (255, 220, 100),  # 古龙金光
+        "eye":   (255, 240, 130),
+        "rune":  (230, 200, 80),
+        "accent":(200, 170, 60),
     },
 }
 
@@ -114,6 +304,61 @@ def stone_noise(dr, x0, y0, x1, y1, base_color, density=0.3):
                 shade = random.randint(-15, 15)
                 c = tuple(max(0, min(255, base_color[i] + shade)) for i in range(3))
                 dr.rectangle([x, y, x + px(2), y + px(2)], fill=c + (60,))
+
+def _row_spans(shape_list):
+    rows = {}
+    for x, y in shape_list:
+        rows.setdefault(y, []).append(x)
+    spans = []
+    for y, xs in rows.items():
+        xs = sorted(xs)
+        start = xs[0]
+        prev = xs[0]
+        for x in xs[1:]:
+            if x == prev + 1:
+                prev = x
+                continue
+            spans.append({"y": y, "start": start, "end": prev, "width": prev - start + 1})
+            start = x
+            prev = x
+        spans.append({"y": y, "start": start, "end": prev, "width": prev - start + 1})
+    return spans
+
+def _choose_face_span(shape_list, min_y):
+    """Pick best row for face — prefer upper body, wide spans."""
+    max_y = max(p[1] for p in shape_list)
+    height = max_y - min_y + 1
+    spans = _row_spans(shape_list)
+    for min_w in [3, 2]:
+        for ratio in [0.35, 0.55, 0.75, 1.0]:
+            cutoff = min_y + max(1, int(height * ratio))
+            cands = [s for s in spans if s["y"] <= cutoff and s["width"] >= min_w]
+            if cands:
+                cands.sort(key=lambda s: (s["y"], -s["width"]))
+                return cands[0]
+    spans.sort(key=lambda s: (-s["width"], s["y"]))
+    return spans[0]
+
+def _choose_mouth_span(shape_list, face_span):
+    spans = _row_spans(shape_list)
+    candidates = []
+    for span in spans:
+        if span["y"] < face_span["y"]:
+            continue
+        overlap_start = max(span["start"], face_span["start"])
+        overlap_end = min(span["end"], face_span["end"])
+        overlap = overlap_end - overlap_start + 1
+        if overlap > 0:
+            candidates.append({
+                "y": span["y"],
+                "start": overlap_start,
+                "end": overlap_end,
+                "width": overlap,
+            })
+    if not candidates:
+        return {"y": face_span["y"], "start": face_span["start"], "end": face_span["end"], "width": face_span["width"]}
+    candidates.sort(key=lambda s: (0 if s["y"] == face_span["y"] + 1 else 1, -s["width"], s["y"]))
+    return candidates[0]
 
 def gen_boss_sheet(name, cfg):
     """生成单个Boss的atlas贴图"""
@@ -231,96 +476,117 @@ def gen_boss_sheet(name, cfg):
 
 
 def _draw_face(img, cfg, shape, shape_list, avg_x, avg_y, cell):
-    """在Boss贴图上画眼睛+嘴巴，返回新img（因为add_glow创建新Image）"""
-    dr = ImageDraw.Draw(img)
+    """Draw face (eyes + mouth) strictly clipped to body cells."""
     glow_c = cfg["glow"]
     eye_c = cfg["eye"]
     body = cfg["body"]
 
+    # ── Build body mask for clipping ──
+    body_mask = Image.new("L", img.size, 0)
+    bm_dr = ImageDraw.Draw(body_mask)
+    for (cx, cy) in shape:
+        x0, y0 = px(cx * cell), px(cy * cell)
+        x1, y1 = px((cx + 1) * cell), px((cy + 1) * cell)
+        bm_dr.rectangle([x0, y0, x1, y1], fill=255)
+
+    # ── Face layer (all face features drawn here, clipped later) ──
+    face = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    dr = ImageDraw.Draw(face)
+
     min_y = min(p[1] for p in shape_list)
-    top_row = sorted([p for p in shape_list if p[1] == min_y], key=lambda p: p[0])
+    face_span = _choose_face_span(shape_list, min_y)
+    face_cells = [(x, face_span["y"]) for x in range(face_span["start"], face_span["end"] + 1)]
 
-    # ── 选眼睛位置：取上排靠中心的两格 ──
-    if len(top_row) >= 3:
-        mid = len(top_row) // 2
-        eye_left = top_row[mid - 1]
-        eye_right = top_row[mid + 1] if mid + 1 < len(top_row) else top_row[mid]
-    elif len(top_row) >= 2:
-        eye_left = top_row[0]
-        eye_right = top_row[-1]
+    # ── Eye cell selection ──
+    if len(face_cells) >= 5:
+        eye_left = face_cells[1]
+        eye_right = face_cells[-2]
+    elif len(face_cells) >= 3:
+        eye_left = face_cells[0]
+        eye_right = face_cells[-1]
+    elif len(face_cells) == 2:
+        eye_left = face_cells[0]
+        eye_right = face_cells[1]
     else:
-        eye_left = top_row[0]
-        eye_right = top_row[0]
+        eye_left = face_cells[0]
+        eye_right = face_cells[0]
 
-    # ── 画两只眼睛 ──
-    for ec in [eye_left, eye_right]:
-        ex = (ec[0] + 0.5) * cell
-        ey = (ec[1] + 0.35) * cell
-        # 眼窝背景（覆盖裂纹）
+    eye_inset = 0.34 if len(face_cells) <= 2 else 0.5
+    if eye_left == eye_right:
+        eye_positions = [
+            ((eye_left[0] + 0.35) * cell, (eye_left[1] + 0.46) * cell),
+            ((eye_right[0] + 0.65) * cell, (eye_right[1] + 0.46) * cell),
+        ]
+    else:
+        eye_positions = [
+            ((eye_left[0] + eye_inset) * cell, (eye_left[1] + 0.46) * cell),
+            ((eye_right[0] + (1.0 - eye_inset)) * cell, (eye_right[1] + 0.46) * cell),
+        ]
+
+    # ── Draw eyes on face layer ──
+    eye_socket_w = min(14, max(9, int(cell * 0.13)))
+    eye_socket_h = min(10, max(7, int(cell * 0.09)))
+    eye_outer_r = min(7, max(5, int(cell * 0.11)))
+    eye_inner_r = max(3, eye_outer_r - 3)
+    eye_highlight_r = max(1.5, eye_inner_r * 0.4)
+
+    for ex, ey in eye_positions:
         bg_c = tuple(max(0, c - 15) for c in body)
-        rect(dr, ex - 18, ey - 13, ex + 18, ey + 13, fill=bg_c + (255,), radius=10)
-        # 眼窝深凹
-        rect(dr, ex - 15, ey - 10, ex + 15, ey + 10, fill=(8, 8, 12, 255), radius=8)
-        # 发光
-        img = add_glow(img, px(ex), px(ey), px(14), glow_c + (160,))
-        dr = ImageDraw.Draw(img)
-        # 眼球
-        circle(dr, ex, ey, 9, eye_c + (255,))
-        # 内瞳
+        rect(dr, ex - eye_socket_w, ey - eye_socket_h,
+             ex + eye_socket_w, ey + eye_socket_h, fill=bg_c + (255,), radius=8)
+        rect(dr, ex - eye_socket_w + 2, ey - eye_socket_h + 2,
+             ex + eye_socket_w - 2, ey + eye_socket_h - 2, fill=(8, 8, 12, 255), radius=7)
+        face = add_glow(face, px(ex), px(ey), px(10), glow_c + (140,))
+        dr = ImageDraw.Draw(face)
+        circle(dr, ex, ey, eye_outer_r, eye_c + (255,))
         bright = (min(255, eye_c[0]+100), min(255, eye_c[1]+100), min(255, eye_c[2]+100))
-        circle(dr, ex, ey, 5, bright + (255,))
-        # 高光点
-        circle(dr, ex - 3, ey - 3, 2.5, (255, 255, 255, 220))
+        circle(dr, ex, ey, eye_inner_r, bright + (255,))
+        circle(dr, ex - eye_outer_r * 0.35, ey - eye_outer_r * 0.35,
+               eye_highlight_r, (255, 255, 255, 220))
 
-    # ── 选嘴巴位置：眼睛下方一行 ──
-    mouth_y = min_y + 1
-    mouth_row = sorted([p for p in shape_list if p[1] == mouth_y], key=lambda p: p[0])
-    if not mouth_row:
-        mouth_row = top_row
-        mouth_y = min_y
-        mouth_vert_offset = 0.78
-    else:
-        mouth_vert_offset = 0.35
-
-    # 嘴巴横跨中间1~3格
-    mid = len(mouth_row) // 2
-    m_start = max(0, mid - 1)
-    m_end = min(len(mouth_row), mid + 2)
-    mouth_cells = mouth_row[m_start:m_end]
+    # ── Mouth on face layer ──
+    mouth_span = _choose_mouth_span(shape_list, face_span)
+    mouth_cells = [(x, mouth_span["y"]) for x in range(mouth_span["start"], mouth_span["end"] + 1)]
 
     if mouth_cells:
-        mx_left = (mouth_cells[0][0] + 0.12) * cell
-        mx_right = (mouth_cells[-1][0] + 0.88) * cell
-        my = (mouth_cells[0][1] + mouth_vert_offset) * cell
-        mouth_h = 16
+        max_cells = 3 if len(mouth_cells) >= 3 else len(mouth_cells)
+        mouth_mid = len(mouth_cells) // 2
+        mouth_start = max(0, mouth_mid - (max_cells // 2))
+        mouth_end = mouth_start + max_cells
+        mouth_cells = mouth_cells[mouth_start:mouth_end]
 
-        # 嘴巴背景（覆盖裂纹）
+        mx_left = (mouth_cells[0][0] + 0.24) * cell
+        mx_right = (mouth_cells[-1][0] + 0.76) * cell
+        my = (mouth_cells[0][1] + 0.68) * cell
+        mouth_h = min(12, max(8, int(cell * 0.18)))
+
         bg_c = tuple(max(0, c - 15) for c in body)
-        rect(dr, mx_left - 3, my - mouth_h * 0.5 - 3, mx_right + 3, my + mouth_h * 0.5 + 3,
+        rect(dr, mx_left - 3, my - mouth_h * 0.5 - 2, mx_right + 3, my + mouth_h * 0.5 + 2,
              fill=bg_c + (255,), radius=4)
-        # 嘴巴黑洞
         rect(dr, mx_left, my - mouth_h * 0.5, mx_right, my + mouth_h * 0.5,
              fill=(12, 8, 14, 255), radius=4)
-        # 深红内腔
-        rect(dr, mx_left + 4, my - mouth_h * 0.3, mx_right - 4, my + mouth_h * 0.3,
+        rect(dr, mx_left + 3, my - mouth_h * 0.25, mx_right - 3, my + mouth_h * 0.25,
              fill=(60, 10, 10, 200), radius=2)
 
-        # 上排尖牙
-        tooth_w = 10
-        n_teeth = max(3, int((mx_right - mx_left) / (tooth_w + 3)))
+        tooth_w = min(7, max(5, int(cell * 0.1)))
+        n_teeth = max(2, int((mx_right - mx_left) / (tooth_w + 4)))
         spacing = (mx_right - mx_left) / n_teeth
         for i in range(n_teeth):
-            tx = mx_left + i * spacing + spacing * 0.15
+            tx = mx_left + i * spacing + spacing * 0.22
             poly(dr, [(tx, my - mouth_h * 0.5),
-                      (tx + tooth_w * 0.5, my - mouth_h * 0.5 + 10),
+                      (tx + tooth_w * 0.5, my - mouth_h * 0.5 + 7),
                       (tx + tooth_w, my - mouth_h * 0.5)],
                  fill=(210, 210, 195, 255))
             poly(dr, [(tx + spacing * 0.08, my + mouth_h * 0.5),
-                      (tx + tooth_w * 0.5, my + mouth_h * 0.5 - 8),
+                      (tx + tooth_w * 0.5, my + mouth_h * 0.5 - 6),
                       (tx + tooth_w - spacing * 0.08, my + mouth_h * 0.5)],
                  fill=(190, 190, 175, 255))
 
-    return img
+    # ── Clip face layer to body mask, composite ──
+    face_a = face.split()[3]
+    clipped_a = ImageChops.multiply(face_a, body_mask)
+    face.putalpha(clipped_a)
+    return Image.alpha_composite(img, face)
 
 def gen_boss():
     """生成所有Boss贴图"""

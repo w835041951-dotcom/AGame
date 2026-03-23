@@ -14,51 +14,54 @@ var _display_boss_hp: float = 0.0
 var _prev_player_hp: int = -1
 
 func _ready():
-	# 地牢风格 HUD
+	_apply_theme()
+	UIThemeManager.theme_changed.connect(func(_n): _apply_theme())
+
+func _apply_theme():
+	var tm = UIThemeManager
 	floor_label.add_theme_font_size_override("font_size", 20)
-	floor_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.45))
+	floor_label.add_theme_color_override("font_color", tm.get("text_accent"))
 	floor_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	floor_label.add_theme_constant_override("shadow_offset_x", 1)
 	floor_label.add_theme_constant_override("shadow_offset_y", 1)
 	timer_label.add_theme_font_size_override("font_size", 24)
-	timer_label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.82))
+	timer_label.add_theme_color_override("font_color", tm.get("text_primary"))
 	timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	timer_label.add_theme_constant_override("shadow_offset_x", 1)
 	timer_label.add_theme_constant_override("shadow_offset_y", 1)
 	clicks_label.add_theme_font_size_override("font_size", 17)
-	clicks_label.add_theme_color_override("font_color", Color(0.72, 0.68, 0.58))
+	clicks_label.add_theme_color_override("font_color", tm.get("text_secondary"))
 	player_hp_label.add_theme_font_size_override("font_size", 19)
-	player_hp_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.35))
+	player_hp_label.add_theme_color_override("font_color", tm.get("player_hp_text"))
 	player_hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	player_hp_label.add_theme_constant_override("shadow_offset_x", 1)
 	player_hp_label.add_theme_constant_override("shadow_offset_y", 1)
 	boss_hp_label.add_theme_font_size_override("font_size", 16)
-	boss_hp_label.add_theme_color_override("font_color", Color(0.90, 0.85, 0.75))
+	boss_hp_label.add_theme_color_override("font_color", tm.get("boss_hp_text"))
 	_style_boss_bar()
 
 func _style_boss_bar():
+	var tm = UIThemeManager
 	var bg = StyleBoxFlat.new()
-	bg.bg_color = Color(0.10, 0.08, 0.06)
-	bg.border_color = Color(0.40, 0.32, 0.22)
+	bg.bg_color = tm.get("boss_bar_bg")
+	bg.border_color = tm.get("boss_bar_brd")
 	bg.set_border_width_all(2)
-	bg.set_corner_radius_all(3)
+	bg.set_corner_radius_all(tm.get("corner_radius"))
 	boss_hp_bar.add_theme_stylebox_override("background", bg)
 	var fill = StyleBoxFlat.new()
-	fill.bg_color = Color(0.72, 0.15, 0.10)
-	fill.set_corner_radius_all(2)
+	fill.bg_color = tm.get("boss_bar_fill")
+	fill.set_corner_radius_all(tm.get("corner_radius"))
 	boss_hp_bar.add_theme_stylebox_override("fill", fill)
 
 func _process(delta):
 	floor_label.text     = "🏰 第 %d 层" % GameManager.floor_number
 	clicks_label.text    = "👆 探索: %d" % GameManager.current_clicks
 
-	# Boss HP 平滑过渡
 	boss_hp_bar.max_value = max(GameManager.boss_max_hp, 1)
 	_display_boss_hp = lerp(_display_boss_hp, float(GameManager.boss_hp), delta * 8.0)
 	boss_hp_bar.value = _display_boss_hp
 	boss_hp_label.text   = "Boss: %d/%d" % [GameManager.boss_hp, GameManager.boss_max_hp]
 
-	# 玩家 HP 受伤闪红
 	player_hp_label.text = "❤ HP: %d/%d" % [GameManager.player_hp, GameManager.player_max_hp]
 	if _prev_player_hp >= 0 and GameManager.player_hp < _prev_player_hp:
 		_flash_hp_label()
@@ -68,9 +71,8 @@ func _process(delta):
 	timer_label.text = "⏱ %.0f" % t
 	var warn = t < 10.0 and GameManager.timer_running
 	timer_label.add_theme_color_override("font_color",
-		Color(1.0, 0.25, 0.15) if warn else Color(0.92, 0.90, 0.82))
+		UIThemeManager.get("text_danger") if warn else UIThemeManager.get("text_primary"))
 
-	# 倒计时最后10秒每秒beep
 	var t_int = int(t)
 	if warn and t_int != _last_timer_int:
 		_last_timer_int = t_int
