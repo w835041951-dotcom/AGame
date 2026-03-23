@@ -10,5 +10,6 @@ func trigger_bomb(x: int, y: int, bomb_type: String):
 	attack_animation_started.emit(bomb_type, Vector2i(x, y))
 	# 动画结束后造成伤害（由动画节点回调）
 	await get_tree().create_timer(0.5).timeout
-	GameManager.deal_damage_to_boss(damage)
+	BossGrid.apply_damage_to_tile(Vector2i(x, y), damage)
+	GameManager.sync_boss_hp()
 	attack_dealt.emit(damage)

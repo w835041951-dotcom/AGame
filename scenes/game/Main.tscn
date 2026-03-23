@@ -72,6 +72,11 @@ position = Vector2(1380, 8)
 size = Vector2(220, 48)
 text = "结束回合 ▶"
 
+[node name="ResetBtn" type="Button" parent="BombSelector"]
+position = Vector2(1160, 8)
+size = Vector2(200, 48)
+text = "⟳ 重置探索"
+
 [node name="InventoryLabel" type="Label" parent="BombSelector"]
 position = Vector2(1180, 18)
 

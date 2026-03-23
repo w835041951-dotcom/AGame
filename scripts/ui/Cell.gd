@@ -16,6 +16,50 @@ var _current_state: DisplayState = DisplayState.EMPTY
 static var _bomb_textures: Dictionary = {}
 static var _boss_textures: Dictionary = {}  # path -> Texture2D
 
+# ── 格子状态纹理 ──
+# 优先从主题目录加载，回退到通用目录
+const CELL_TEX_NAMES = {
+	"empty":        "cell_empty",
+	"mine_hidden":  "cell_mine_hidden",
+	"mine_reveal":  "cell_mine_revealed",
+	"boss_normal":  "cell_boss_normal",
+	"boss_weak":    "cell_boss_weak",
+	"boss_armor":   "cell_boss_armor",
+	"boss_absorb":  "cell_boss_absorb",
+	"boss_dead":    "cell_boss_dead",
+	"blocked":      "cell_blocked",
+	"exploding":    "cell_exploding",
+	"bomb_placed":  "cell_bomb_placed",
+	"minion":       "cell_minion",
+	"hp_bar_bg":    "hp_bar_bg",
+	"hp_bar_fill":  "hp_bar_fill",
+}
+const CELL_TEX_FALLBACK = {
+	"empty":       "res://assets/sprites/ui/cell_empty.png",
+	"mine_hidden": "res://assets/sprites/ui/cell_mine_hidden.png",
+	"mine_reveal": "res://assets/sprites/ui/cell_mine_revealed.png",
+	"boss_normal": "res://assets/sprites/ui/cell_boss_normal.png",
+	"boss_weak":   "res://assets/sprites/ui/cell_boss_weak.png",
+	"boss_armor":  "res://assets/sprites/ui/cell_boss_armor.png",
+	"boss_absorb": "res://assets/sprites/ui/cell_boss_absorb.png",
+	"boss_dead":   "res://assets/sprites/ui/cell_boss_dead.png",
+	"hp_bar_bg":   "res://assets/sprites/ui/hp_bar_bg.png",
+	"hp_bar_fill": "res://assets/sprites/ui/hp_bar_fill.png",
+}
+
+static func _get_cell_tex(key: String) -> Texture2D:
+	# 1) 尝试主题素材
+	var themed_name = CELL_TEX_NAMES.get(key, "")
+	if themed_name != "":
+		var tex = UIThemeManager.get_themed(themed_name)
+		if tex:
+			return tex
+	# 2) 回退到通用素材
+	var path = CELL_TEX_FALLBACK.get(key, "")
+	if path != "" and ResourceLoader.exists(path):
+		return load(path) as Texture2D
+	return null
+
 var _marked_safe: bool = false  # 右键标记为"安全/空"
 
 func is_marked() -> bool:
@@ -29,7 +73,7 @@ func setup(x: int, y: int, m: Mode, sz: int = 64):
 	custom_minimum_size = Vector2(cell_size, cell_size)
 	size = Vector2(cell_size, cell_size)
 	text = ""
-	add_theme_font_size_override("font_size", max(12, cell_size / 3))
+	add_theme_font_size_override("font_size", max(14, cell_size * 0.38))
 	set_display_state(DisplayState.MINE_HIDDEN if mode == Mode.MINE else DisplayState.EMPTY)
 	pressed.connect(_on_pressed)
 
@@ -46,17 +90,21 @@ func _on_pressed():
 	if mode == Mode.PLACEMENT:
 		BombPlacer.on_cell_clicked(grid_x, grid_y)
 	else:
-		GridManager.reveal_cell(grid_x, grid_y)
+		GridManager.reveal_cell(grid_x, grid_y, Input.is_key_pressed(KEY_SHIFT))
 
 func _update_mark_display():
 	if _marked_safe:
 		text = "○"
-		add_theme_font_size_override("font_size", 24)
+		add_theme_font_size_override("font_size", max(20, cell_size * 0.38))
 		add_theme_color_override("font_color", UIThemeManager.color("text_heal"))
+		add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+		add_theme_constant_override("shadow_offset_x", 1)
+		add_theme_constant_override("shadow_offset_y", 1)
 	else:
 		text = ""
 		remove_theme_color_override("font_color")
-		add_theme_font_size_override("font_size", 20)
+		remove_theme_color_override("font_shadow_color")
+		add_theme_font_size_override("font_size", max(14, cell_size * 0.38))
 
 var _hp_ratio: float = -1.0  # -1 = 不显示HP条
 
@@ -68,22 +116,24 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 	disabled = false
 	expand_icon = false
 	tooltip_text = ""
+	modulate = Color.WHITE
 	# 每次重置颜色和字号，防止上次状态残留
 	remove_theme_color_override("font_color")
 	remove_theme_color_override("font_disabled_color")
-	add_theme_font_size_override("font_size", 20)
+	remove_theme_color_override("font_shadow_color")
+	add_theme_font_size_override("font_size", max(16, cell_size * 0.35))
 
 	var tm = UIThemeManager
 
 	match state:
 		DisplayState.EMPTY:
-			_apply_style(tm.color("bg_empty"), tm.color("border_default"), 1)
+			_apply_tex_or_flat("empty", tm.color("bg_empty"), tm.color("border_default"), 0)
 
 		DisplayState.BOMB_PLACED:
 			var bomb_type = extra.get("bomb_type", "pierce_h")
 			var info = BombRegistry.get_bomb_info(bomb_type)
 			var col = info.get("color", Color.RED)
-			_apply_style(col.darkened(0.5), col, 2)
+			_apply_tex_or_flat("bomb_placed", col.darkened(0.5), col, 1)
 			icon = _get_bomb_texture(bomb_type)
 			expand_icon = true
 			var lvl = BombRegistry.get_bomb_level(bomb_type)
@@ -91,7 +141,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), lvl, range_desc]
 
 		DisplayState.BLOCKED:
-			_apply_style(Color(0.22, 0.05, 0.05), tm.color("text_danger").darkened(0.35), 2)
+			_apply_tex_or_flat("blocked", tm.color("blocked_bg"), tm.color("text_danger").darkened(0.35), 1)
 			text = "✕"
 			add_theme_color_override("font_color", tm.color("text_danger"))
 			disabled = true
@@ -100,13 +150,8 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			var border_col = tm.color("text_danger").darkened(0.2)
-			var border_w = 1
-			match state:
-				DisplayState.BOSS_WEAK:   border_col = tm.color("boss_weak_brd");   border_w = 3
-				DisplayState.BOSS_ARMOR:  border_col = tm.color("boss_armor_brd");  border_w = 3
-				DisplayState.BOSS_ABSORB: border_col = tm.color("boss_absorb_brd"); border_w = 2
-			_apply_style(Color(0,0,0,0), border_col, border_w)
+			# 透明背景，让Boss贴图完全显示
+			_apply_style(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0)
 			_show_boss_info(extra)
 			var hp = extra.get("hp", -1)
 			var max_hp = extra.get("max_hp", 1)
@@ -117,27 +162,31 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			_apply_style(tm.color("bg_void"), tm.color("bg_secondary"), 1)
-			modulate = Color(0.35, 0.3, 0.3, 0.5)
+			_apply_tex_or_flat("boss_dead", tm.color("bg_void"), tm.color("bg_secondary"), 1)
+			modulate = tm.color("boss_dead_tint")
 			_hp_ratio = -1.0
 			queue_redraw()
 
 		DisplayState.EXPLODING:
-			_apply_style(tm.color("explode_bg"), tm.color("explode_brd"), 3)
+			_apply_tex_or_flat("exploding", tm.color("explode_bg"), tm.color("explode_brd"), 2)
 			_flash_explode()
 
 		DisplayState.MINE_HIDDEN:
-			_apply_style(tm.color("mine_hidden"), tm.color("mine_hidden_brd"), 2)
+			_apply_tex_or_flat("mine_hidden", tm.color("mine_hidden"), tm.color("mine_hidden_brd"), 1)
 
 		DisplayState.MINE_REVEALED:
-			_apply_style(tm.color("mine_reveal"), tm.color("mine_reveal_brd"), 1)
+			_apply_tex_or_flat("mine_reveal", tm.color("mine_reveal"), tm.color("mine_reveal_brd"), 0)
 			disabled = true
 			var adj = extra.get("adjacent", 0)
 			if adj > 0:
 				text = str(adj)
+				add_theme_font_size_override("font_size", max(18, cell_size * 0.42))
 				var nc = tm.get_number_color(adj)
 				add_theme_color_override("font_color", nc)
 				add_theme_color_override("font_disabled_color", nc)
+				add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+				add_theme_constant_override("shadow_offset_x", 1)
+				add_theme_constant_override("shadow_offset_y", 1)
 			else:
 				add_theme_color_override("font_color", Color(0,0,0,0))
 				add_theme_color_override("font_disabled_color", Color(0,0,0,0))
@@ -165,36 +214,50 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 		DisplayState.MINION:
 			var minion_color = extra.get("color", Color(0.4, 0.9, 0.3))
 			var label_text = extra.get("label", "怪")
-			_apply_style(minion_color.darkened(0.6), minion_color, 3)
+			_apply_tex_or_flat("minion", minion_color.darkened(0.6), minion_color, 1)
 			text = label_text.substr(0, 1)
-			add_theme_font_size_override("font_size", max(14, cell_size / 3))
+			add_theme_font_size_override("font_size", max(16, cell_size * 0.38))
 			add_theme_color_override("font_color", minion_color.lightened(0.6))
+			add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+			add_theme_constant_override("shadow_offset_x", 1)
+			add_theme_constant_override("shadow_offset_y", 1)
 			var hp = extra.get("hp", -1)
 			var max_hp = extra.get("max_hp", 1)
 			_hp_ratio = float(hp) / max(max_hp, 1) if hp >= 0 else -1.0
 			tooltip_text = "%s  HP: %d/%d" % [label_text, hp, max_hp]
 			queue_redraw()
 
-	modulate = Color.WHITE
 	if _hp_ratio < 0.0:
 		queue_redraw()
 
 func _draw():
 	if _hp_ratio < 0.0 or _hp_ratio > 1.0:
 		return
-	var bar_h = max(5, cell_size / 12)
-	var bar_y = cell_size - bar_h
-	draw_rect(Rect2(1, bar_y, cell_size - 2, bar_h), Color(0.05, 0.05, 0.05, 0.85))
+	var bar_h = max(8, cell_size / 7)
+	var bar_y = cell_size - bar_h - 1
+	# 背景纹理
+	var bg_tex = _get_cell_tex("hp_bar_bg")
+	if bg_tex:
+		draw_texture_rect(bg_tex, Rect2(1, bar_y, cell_size - 2, bar_h), false)
+	else:
+		draw_rect(Rect2(1, bar_y, cell_size - 2, bar_h), UIThemeManager.color("hp_bar_bg"))
+	# 填充
 	var bar_col: Color
 	if _hp_ratio > 0.6:
 		bar_col = UIThemeManager.color("text_heal")
 	elif _hp_ratio > 0.3:
-		bar_col = Color(0.95, 0.75, 0.1)
+		bar_col = UIThemeManager.color("hp_bar_mid")
 	else:
 		bar_col = UIThemeManager.color("text_danger")
 	var fill_w = int((cell_size - 2) * _hp_ratio)
 	if fill_w > 0:
-		draw_rect(Rect2(1, bar_y, fill_w, bar_h), bar_col)
+		var fill_tex = _get_cell_tex("hp_bar_fill")
+		if fill_tex:
+			draw_texture_rect(fill_tex, Rect2(1, bar_y, fill_w, bar_h), false, bar_col)
+		else:
+			draw_rect(Rect2(1, bar_y, fill_w, bar_h), bar_col)
+	# Slim outline for clarity
+	draw_rect(Rect2(1, bar_y, cell_size - 2, bar_h), UIThemeManager.color("shadow_color"), false, 1.0)
 
 func _get_bomb_texture(bomb_type: String) -> Texture2D:
 	if bomb_type in _bomb_textures:
@@ -216,10 +279,10 @@ func _get_boss_cell_texture(local_pos: Vector2i) -> AtlasTexture:
 	var tex = _boss_textures[tex_path]
 	if tex == null:
 		return null
-	if BossGrid.boss_width <= 0 or BossGrid.boss_height <= 0:
+	if BossGrid.atlas_cols <= 0 or BossGrid.atlas_rows <= 0:
 		return null
-	var tile_w = int(tex.get_width()  / float(BossGrid.boss_width))
-	var tile_h = int(tex.get_height() / float(BossGrid.boss_height))
+	var tile_w = int(tex.get_width()  / float(BossGrid.atlas_cols))
+	var tile_h = int(tex.get_height() / float(BossGrid.atlas_rows))
 	var region = Rect2(local_pos.x * tile_w, local_pos.y * tile_h, tile_w, tile_h)
 	if region.position.x + tile_w > tex.get_width() or region.position.y + tile_h > tex.get_height():
 		return null
@@ -230,12 +293,15 @@ func _get_boss_cell_texture(local_pos: Vector2i) -> AtlasTexture:
 
 func _show_boss_info(extra: Dictionary):
 	var part = extra.get("part", BossGrid.BodyPart.NONE)
+	var hp = extra.get("hp", 0)
+	var max_hp = extra.get("max_hp", 1)
+	var part_name = ""
 	match part:
-		BossGrid.BodyPart.HEAD: text = "H"
-		BossGrid.BodyPart.LEG:  text = "L"
-		BossGrid.BodyPart.CORE: text = "C"
-	if text != "":
-		add_theme_color_override("font_color", UIThemeManager.color("text_accent"))
+		BossGrid.BodyPart.HEAD: part_name = "头部"
+		BossGrid.BodyPart.LEG:  part_name = "腿部"
+		BossGrid.BodyPart.CORE: part_name = "核心"
+		_: part_name = "身体"
+	tooltip_text = "%s  HP: %d/%d" % [part_name, hp, max_hp]
 
 func _bomb_symbol(bomb_type: String) -> String:
 	match bomb_type:
@@ -273,6 +339,25 @@ func animate_destruction():
 	pivot_offset = size / 2
 	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_property(self, "scale", Vector2(0.6, 0.6), 0.3)
+
+func animate_boss_death(delay: float = 0.0):
+	pivot_offset = size / 2
+	var tween = create_tween()
+	if delay > 0.0:
+		tween.tween_interval(delay)
+	# 先闪白
+	tween.tween_property(self, "modulate", Color(4.0, 3.5, 1.5, 1.0), 0.06)
+	# 膨胀
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", Vector2(1.3, 1.3), 0.12).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(self, "modulate", Color(1.5, 0.4, 0.1, 1.0), 0.12)
+	tween.set_parallel(false)
+	# 爆裂缩小 + 旋转
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", Vector2(0.0, 0.0), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_property(self, "modulate", Color(0.5, 0.1, 0.0, 0.0), 0.25)
+	tween.tween_property(self, "rotation", randf_range(-0.5, 0.5), 0.25)
+	await tween.finished
 
 func animate_reveal():
 	pivot_offset = size / 2
@@ -318,7 +403,7 @@ func _apply_style(bg: Color, border: Color, border_w: int):
 	s.set_border_width_all(border_w)
 	s.border_color = border
 	s.set_corner_radius_all(cr)
-	s.shadow_color = Color(0, 0, 0, 0.35)
+	s.shadow_color = UIThemeManager.color("shadow_color")
 	s.shadow_size = 2
 	add_theme_stylebox_override("normal", s)
 	var h = s.duplicate()
@@ -328,4 +413,23 @@ func _apply_style(bg: Color, border: Color, border_w: int):
 	var p = s.duplicate()
 	p.bg_color = bg.darkened(0.06)
 	add_theme_stylebox_override("pressed", p)
+	add_theme_stylebox_override("disabled", s)
+
+func _apply_tex_or_flat(tex_key: String, fallback_bg: Color, border: Color, border_w: int):
+	var tex = _get_cell_tex(tex_key)
+	if tex == null:
+		_apply_style(fallback_bg, border, border_w)
+		return
+	var s = StyleBoxTexture.new()
+	s.texture = tex
+	s.modulate_color = Color.WHITE
+	add_theme_stylebox_override("normal", s)
+	var h_box = StyleBoxTexture.new()
+	h_box.texture = tex
+	h_box.modulate_color = Color(1.25, 1.25, 1.25, 1.0)
+	add_theme_stylebox_override("hover", h_box)
+	var p_box = StyleBoxTexture.new()
+	p_box.texture = tex
+	p_box.modulate_color = Color(0.9, 0.9, 0.9, 1.0)
+	add_theme_stylebox_override("pressed", p_box)
 	add_theme_stylebox_override("disabled", s)

@@ -1,32 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:kenney.nl)",
-      "WebSearch",
-      "Bash(powershell -ExecutionPolicy Bypass -Command \":*)",
-      "Bash(pip install:*)",
-      "Bash(python scripts/tools/gen_sprites.py)",
-      "Bash(python scripts/tools/gen_boss.py)",
-      "Bash(python scripts/tools/gen_assets.py)",
-      "Bash(python -c \":*)",
-      "Bash(python:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(cat:*)",
-      "Bash(grep:*)",
-      "Bash(sed:*)",
+      "Bash",
       "Read",
-      "Write(q:/AGame/**)",
-      "Edit(q:/AGame/**)",
+      "Write",
+      "Edit",
       "Glob",
       "Grep",
-      "Skill(update-config)",
-      "Skill(update-config:*)",
-      "Bash(done)"
-    ]
+      "WebFetch",
+      "WebSearch",
+      "Bash(python tools/generate_story_art.py)"
+    ],
+    "defaultMode": "acceptEdits"
   }
 }

@@ -29,7 +29,7 @@ func setup():
 	phase = PHASE_NONE
 
 	var floor_n = GameManager.floor_number
-	var level = LevelData.get_level_raw(floor_n)
+	var level = LevelData.get_level(floor_n)
 	if level.is_empty() or not level.has("minions"):
 		phase = PHASE_BOSS  # 无小怪，直接Boss阶段
 		return
@@ -98,3 +98,36 @@ func alive_count() -> int:
 
 func has_minions() -> bool:
 	return phase == PHASE_MINIONS and alive_count() > 0
+
+func spawn_random_minion(count: int = 1):
+	var spawn_candidates: Array = []
+	for y in range(BossGrid.placement_rows):
+		for x in range(max(1, int(BossGrid.placement_cols * 0.35))):
+			var p = Vector2i(x, y)
+			if minion_tiles.has(p) and minion_tiles[p]["alive"]:
+				continue
+			if BossGrid.is_boss_tile(p):
+				continue
+			spawn_candidates.append(p)
+	if spawn_candidates.is_empty():
+		return
+
+	phase = PHASE_MINIONS
+	spawn_candidates.shuffle()
+	for i in range(min(count, spawn_candidates.size())):
+		var world_pos = spawn_candidates[i]
+		var type_pool = ["grunt", "shield", "volatile"]
+		var mtype = type_pool[randi() % type_pool.size()]
+		var def = MINION_TYPES.get(mtype, MINION_TYPES["grunt"])
+		var hp_mult = LevelData.get_hp_multiplier(GameManager.floor_number)
+		var hp = max(1, int(def["hp"] * hp_mult * 0.7))
+		minion_tiles[world_pos] = {
+			"hp": hp,
+			"max_hp": hp,
+			"alive": true,
+			"drop_type": def["drop"],
+			"label": "召",
+			"color": def["color"],
+			"mtype": mtype,
+		}
+	minions_refreshed.emit()

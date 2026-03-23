@@ -25,16 +25,24 @@ func show_choices(upgrades: Array, permanent: bool):
 		choice_container.add_child(btn)
 
 func _make_btn(upgrade: Dictionary) -> Button:
+	var tm = UIThemeManager
 	var btn = Button.new()
 	btn.custom_minimum_size = Vector2(260, 110)
 	btn.text = "%s\n\n%s" % [upgrade["name"], upgrade["description"]]
 	btn.add_theme_font_size_override("font_size", 15)
+	var rarity = upgrade.get("rarity", "common")
 	var col = Color.WHITE
-	match upgrade.get("rarity", "common"):
+	match rarity:
 		"common": col = Color(0.75, 0.75, 0.75)
 		"rare":   col = Color(0.35, 0.55, 1.0)
 		"epic":   col = Color(0.75, 0.30, 1.0)
 	btn.add_theme_color_override("font_color", col)
+	var sn = tm.make_themed_stylebox("card_" + rarity, "btn_normal_bg", "btn_normal_brd")
+	if sn:
+		btn.add_theme_stylebox_override("normal", sn)
+	var sh = tm.make_themed_stylebox("btn_hover", "btn_hover_bg", "border_strong")
+	if sh:
+		btn.add_theme_stylebox_override("hover", sh)
 	btn.pressed.connect(func(): _on_chosen(upgrade))
 	return btn
 

@@ -29,6 +29,7 @@ MinionGrid="*res://scripts/boss/MinionGrid.gd"
 UpgradeManager="*res://scripts/core/UpgradeManager.gd"
 AudioManager="*res://scenes/core/AudioManager.tscn"
 LevelData="*res://scripts/core/LevelData.gd"
+GameSettings="*res://scripts/core/GameSettings.gd"
 
 [display]
 

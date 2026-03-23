@@ -29,8 +29,10 @@ func on_cell_clicked(x: int, y: int):
 		GameManager.add_bomb(old_type)
 		bomb_removed.emit(pos)
 	else:
-		# 不能在活着的Boss格上放炸弹
+		# 所有炸弹都不能放在Boss格上
 		if BossGrid.is_boss_tile(pos):
+			return
+		if BossGrid.is_blocked_cell(pos):
 			return
 		# 检查库存
 		if not GameManager.use_bomb(selected_type):

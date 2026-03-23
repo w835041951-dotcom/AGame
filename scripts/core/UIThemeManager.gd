@@ -1,22 +1,22 @@
 ## UI主题管理器 - AutoLoad
-## 三套风格：暗黑地牢 / 赛博朋克 / 像素复古
+## 三套风格：樱花幻境 / 蒸汽朋克 / 霓虹都市
 ## 所有UI颜色/样式通过此单例获取，保存到用户数据
 
 extends Node
 
 signal theme_changed(new_theme: String)
 
-enum ThemeStyle { DUNGEON, CYBER, PIXEL }
+enum ThemeStyle { SAKURA, STEAM, NEON }
 
 const THEME_NAMES = {
-	ThemeStyle.DUNGEON: "暗黑地牢",
-	ThemeStyle.CYBER:   "赛博朋克",
-	ThemeStyle.PIXEL:   "像素复古",
+	ThemeStyle.SAKURA: "樱花幻境",
+	ThemeStyle.STEAM:   "蒸汽朋克",
+	ThemeStyle.NEON:    "霓虹都市",
 }
 
 const SAVE_PATH = "user://ui_theme.cfg"
 
-var current_theme: int = ThemeStyle.DUNGEON
+var current_theme: int = ThemeStyle.SAKURA
 
 # ── 每套主题的色板 ─────────────────────────────────────────────
 #
@@ -56,166 +56,211 @@ var current_theme: int = ThemeStyle.DUNGEON
 #   dmg_lo / dmg_mid / dmg_hi  三档伤害数字
 
 const PALETTES = {
-	ThemeStyle.DUNGEON: {
-		"bg_empty":        Color(0.18, 0.17, 0.20),
-		"bg_secondary":    Color(0.25, 0.26, 0.30),
-		"bg_void":         Color(0.06, 0.06, 0.07),
-		"border_default":  Color(0.28, 0.26, 0.24),
-		"border_strong":   Color(0.55, 0.45, 0.25),
-		"text_primary":    Color(0.92, 0.90, 0.82),
-		"text_secondary":  Color(0.72, 0.68, 0.58),
-		"text_accent":     Color(0.95, 0.82, 0.45),
-		"text_danger":     Color(1.0, 0.25, 0.15),
-		"text_heal":       Color(0.35, 0.95, 0.45),
-		"hud_bg":          Color(0.10, 0.09, 0.08, 0.92),
-		"boss_bar_bg":     Color(0.10, 0.08, 0.06),
-		"boss_bar_fill":   Color(0.72, 0.15, 0.10),
-		"boss_bar_brd":    Color(0.40, 0.32, 0.22),
-		"boss_hp_text":    Color(0.90, 0.85, 0.75),
-		"player_hp_text":  Color(0.35, 0.85, 0.35),
-		"btn_normal_bg":   Color(0.14, 0.13, 0.11),
-		"btn_normal_brd":  Color(0.32, 0.28, 0.22),
-		"btn_hover_bg":    Color(0.22, 0.19, 0.15),
-		"btn_end_bg":      Color(0.18, 0.15, 0.12),
-		"btn_end_brd":     Color(0.55, 0.45, 0.25),
-		"btn_end_hover":   Color(0.25, 0.20, 0.15),
-		"btn_end_hbrd":    Color(0.70, 0.58, 0.30),
-		"btn_end_text":    Color(0.95, 0.85, 0.45),
-		"explode_bg":      Color(0.90, 0.35, 0.05),
-		"explode_brd":     Color(1.0, 0.65, 0.0),
-		"mine_hidden":     Color(0.25, 0.26, 0.30),
-		"mine_hidden_brd": Color(0.33, 0.35, 0.40),
-		"mine_reveal":     Color(0.58, 0.54, 0.44),
-		"mine_reveal_brd": Color(0.48, 0.44, 0.36),
-		"boss_weak_brd":   Color(0.95, 0.80, 0.15),
-		"boss_armor_brd":  Color(0.45, 0.55, 0.85),
-		"boss_absorb_brd": Color(0.20, 0.75, 0.35),
-		"intro_overlay":   Color(0.02, 0.01, 0.0, 0.85),
-		"whisper_text":    Color(0.45, 0.38, 0.58, 0.7),
-		"floor_text":      Color(0.65, 0.6, 0.5),
-		"boss_label":      Color(0.85, 0.35, 0.25),
-		"section_label":   Color(0.55, 0.50, 0.40, 0.8),
-		"dmg_lo":          Color(1.0, 0.85, 0.2),
-		"dmg_mid":         Color(1.0, 0.45, 0.1),
-		"dmg_hi":          Color(1.0, 0.15, 0.05),
-		"chain_flash":     Color(0.5, 0.8, 2.5),
-		"boss_pulse":      Color(1.3, 1.1, 1.0),
+	ThemeStyle.SAKURA: {
+		"bg_empty":        Color(0.09, 0.06, 0.12),
+		"bg_secondary":    Color(0.16, 0.11, 0.20),
+		"bg_void":         Color(0.03, 0.02, 0.04),
+		"border_default":  Color(0.50, 0.30, 0.45),
+		"border_strong":   Color(1.0, 0.60, 0.78),
+		"text_primary":    Color(1.0, 0.94, 0.96),
+		"text_secondary":  Color(0.85, 0.70, 0.80),
+		"text_accent":     Color(1.0, 0.70, 0.85),
+		"text_danger":     Color(1.0, 0.30, 0.35),
+		"text_heal":       Color(0.40, 1.0, 0.65),
+		"hud_bg":          Color(0.06, 0.04, 0.08, 0.96),
+		"boss_bar_bg":     Color(0.08, 0.05, 0.10),
+		"boss_bar_fill":   Color(0.95, 0.30, 0.50),
+		"boss_bar_brd":    Color(1.0, 0.60, 0.78),
+		"boss_hp_text":    Color(1.0, 0.92, 0.95),
+		"player_hp_text":  Color(0.40, 1.0, 0.60),
+		"btn_normal_bg":   Color(0.12, 0.08, 0.15),
+		"btn_normal_brd":  Color(0.50, 0.30, 0.45),
+		"btn_hover_bg":    Color(0.22, 0.15, 0.28),
+		"btn_end_bg":      Color(0.18, 0.10, 0.22),
+		"btn_end_brd":     Color(1.0, 0.60, 0.78),
+		"btn_end_hover":   Color(0.28, 0.18, 0.35),
+		"btn_end_hbrd":    Color(1.0, 0.75, 0.88),
+		"btn_end_text":    Color(1.0, 0.80, 0.90),
+		"explode_bg":      Color(1.0, 0.50, 0.65),
+		"explode_brd":     Color(1.0, 0.75, 0.85),
+		"mine_hidden":     Color(0.18, 0.12, 0.22),
+		"mine_hidden_brd": Color(0.38, 0.25, 0.40),
+		"mine_reveal":     Color(0.08, 0.05, 0.10),
+		"mine_reveal_brd": Color(0.16, 0.10, 0.18),
+		"boss_weak_brd":   Color(1.0, 0.85, 0.40),
+		"boss_armor_brd":  Color(0.50, 0.55, 1.0),
+		"boss_absorb_brd": Color(0.40, 0.90, 0.60),
+		"intro_overlay":   Color(0.02, 0.01, 0.03, 0.85),
+		"whisper_text":    Color(0.70, 0.45, 0.65, 0.75),
+		"floor_text":      Color(0.95, 0.70, 0.82),
+		"boss_label":      Color(1.0, 0.40, 0.55),
+		"section_label":   Color(0.75, 0.55, 0.68, 0.85),
+		"dmg_lo":          Color(1.0, 0.80, 0.85),
+		"dmg_mid":         Color(1.0, 0.50, 0.60),
+		"dmg_hi":          Color(1.0, 0.20, 0.30),
+		"chain_flash":     Color(1.0, 0.6, 2.0),
+		"boss_pulse":      Color(1.2, 1.0, 1.1),
+		"blocked_bg":      Color(0.30, 0.06, 0.10),
+		"boss_dead_tint":  Color(0.25, 0.20, 0.28, 0.45),
+		"hp_bar_bg":       Color(0.04, 0.03, 0.05, 0.90),
+		"hp_bar_mid":      Color(1.0, 0.70, 0.80),
+		"preview_highlight": Color(1.2, 0.8, 1.0, 0.75),
+		"shadow_color":    Color(0.05, 0, 0.05, 0.65),
+		"card_shadow":     Color(0.05, 0, 0.05, 0.55),
+		"rarity_common":   Color(0.75, 0.65, 0.72),
+		"rarity_common_bg": Color(0.12, 0.08, 0.14),
+		"rarity_rare":     Color(0.60, 0.40, 1.0),
+		"rarity_rare_bg":  Color(0.10, 0.06, 0.22),
+		"rarity_epic":     Color(1.0, 0.40, 0.70),
+		"rarity_epic_bg":  Color(0.20, 0.06, 0.15),
+		"card_name_text":  Color(1.0, 0.95, 0.97),
+		"card_desc_text":  Color(0.85, 0.70, 0.80),
+		"corner_radius":   8,
+		"border_width":    2,
+	},
+	ThemeStyle.STEAM: {
+		"bg_empty":        Color(0.12, 0.09, 0.06),
+		"bg_secondary":    Color(0.20, 0.15, 0.10),
+		"bg_void":         Color(0.04, 0.03, 0.02),
+		"border_default":  Color(0.45, 0.35, 0.18),
+		"border_strong":   Color(0.90, 0.70, 0.25),
+		"text_primary":    Color(0.96, 0.92, 0.82),
+		"text_secondary":  Color(0.78, 0.68, 0.50),
+		"text_accent":     Color(1.0, 0.80, 0.28),
+		"text_danger":     Color(0.95, 0.30, 0.15),
+		"text_heal":       Color(0.30, 0.90, 0.45),
+		"hud_bg":          Color(0.07, 0.05, 0.03, 0.96),
+		"boss_bar_bg":     Color(0.10, 0.07, 0.04),
+		"boss_bar_fill":   Color(0.85, 0.35, 0.10),
+		"boss_bar_brd":    Color(0.80, 0.60, 0.22),
+		"boss_hp_text":    Color(0.96, 0.88, 0.72),
+		"player_hp_text":  Color(0.35, 0.90, 0.40),
+		"btn_normal_bg":   Color(0.14, 0.10, 0.06),
+		"btn_normal_brd":  Color(0.45, 0.35, 0.18),
+		"btn_hover_bg":    Color(0.25, 0.18, 0.10),
+		"btn_end_bg":      Color(0.20, 0.14, 0.06),
+		"btn_end_brd":     Color(0.90, 0.70, 0.25),
+		"btn_end_hover":   Color(0.30, 0.22, 0.10),
+		"btn_end_hbrd":    Color(1.0, 0.82, 0.35),
+		"btn_end_text":    Color(1.0, 0.85, 0.40),
+		"explode_bg":      Color(1.0, 0.55, 0.15),
+		"explode_brd":     Color(1.0, 0.78, 0.25),
+		"mine_hidden":     Color(0.20, 0.16, 0.10),
+		"mine_hidden_brd": Color(0.40, 0.32, 0.20),
+		"mine_reveal":     Color(0.09, 0.07, 0.04),
+		"mine_reveal_brd": Color(0.18, 0.14, 0.08),
+		"boss_weak_brd":   Color(1.0, 0.88, 0.25),
+		"boss_armor_brd":  Color(0.45, 0.55, 0.90),
+		"boss_absorb_brd": Color(0.30, 0.85, 0.40),
+		"intro_overlay":   Color(0.02, 0.01, 0.01, 0.85),
+		"whisper_text":    Color(0.60, 0.48, 0.30, 0.75),
+		"floor_text":      Color(0.90, 0.72, 0.40),
+		"boss_label":      Color(0.95, 0.45, 0.15),
+		"section_label":   Color(0.70, 0.55, 0.32, 0.85),
+		"dmg_lo":          Color(1.0, 0.88, 0.30),
+		"dmg_mid":         Color(1.0, 0.55, 0.15),
+		"dmg_hi":          Color(1.0, 0.22, 0.08),
+		"chain_flash":     Color(0.8, 0.9, 2.0),
+		"boss_pulse":      Color(1.3, 1.15, 1.0),
+		"blocked_bg":      Color(0.30, 0.08, 0.04),
+		"boss_dead_tint":  Color(0.30, 0.25, 0.20, 0.45),
+		"hp_bar_bg":       Color(0.05, 0.04, 0.02, 0.90),
+		"hp_bar_mid":      Color(1.0, 0.80, 0.20),
+		"preview_highlight": Color(1.2, 1.0, 0.6, 0.75),
+		"shadow_color":    Color(0, 0, 0, 0.60),
+		"card_shadow":     Color(0, 0, 0, 0.50),
+		"rarity_common":   Color(0.72, 0.65, 0.50),
+		"rarity_common_bg": Color(0.12, 0.10, 0.06),
+		"rarity_rare":     Color(0.35, 0.60, 0.95),
+		"rarity_rare_bg":  Color(0.08, 0.10, 0.22),
+		"rarity_epic":     Color(0.90, 0.40, 0.20),
+		"rarity_epic_bg":  Color(0.20, 0.08, 0.04),
+		"card_name_text":  Color(0.96, 0.92, 0.82),
+		"card_desc_text":  Color(0.78, 0.68, 0.50),
 		"corner_radius":   4,
 		"border_width":    2,
 	},
-	ThemeStyle.CYBER: {
-		"bg_empty":        Color(0.04, 0.06, 0.12),
-		"bg_secondary":    Color(0.06, 0.04, 0.14),
-		"bg_void":         Color(0.02, 0.02, 0.05),
-		"border_default":  Color(0.15, 0.20, 0.35),
-		"border_strong":   Color(0.0, 0.85, 0.95),
-		"text_primary":    Color(0.85, 0.95, 1.0),
-		"text_secondary":  Color(0.45, 0.75, 0.90),
-		"text_accent":     Color(0.0, 0.95, 0.85),
-		"text_danger":     Color(1.0, 0.15, 0.45),
-		"text_heal":       Color(0.15, 0.95, 0.55),
-		"hud_bg":          Color(0.04, 0.05, 0.12, 0.95),
-		"boss_bar_bg":     Color(0.04, 0.04, 0.10),
-		"boss_bar_fill":   Color(0.9, 0.05, 0.4),
-		"boss_bar_brd":    Color(0.0, 0.85, 0.95),
-		"boss_hp_text":    Color(0.75, 0.90, 1.0),
-		"player_hp_text":  Color(0.15, 0.95, 0.65),
-		"btn_normal_bg":   Color(0.05, 0.06, 0.14),
-		"btn_normal_brd":  Color(0.10, 0.35, 0.55),
-		"btn_hover_bg":    Color(0.08, 0.12, 0.22),
-		"btn_end_bg":      Color(0.06, 0.08, 0.18),
-		"btn_end_brd":     Color(0.0, 0.80, 0.90),
-		"btn_end_hover":   Color(0.10, 0.15, 0.28),
-		"btn_end_hbrd":    Color(0.3, 1.0, 1.0),
-		"btn_end_text":    Color(0.0, 0.95, 0.90),
-		"explode_bg":      Color(0.9, 0.05, 0.5),
-		"explode_brd":     Color(1.0, 0.3, 0.8),
-		"mine_hidden":     Color(0.05, 0.07, 0.16),
-		"mine_hidden_brd": Color(0.12, 0.22, 0.40),
-		"mine_reveal":     Color(0.08, 0.14, 0.25),
-		"mine_reveal_brd": Color(0.0, 0.65, 0.80),
-		"boss_weak_brd":   Color(0.0, 0.95, 0.85),
-		"boss_armor_brd":  Color(0.3, 0.4, 1.0),
-		"boss_absorb_brd": Color(0.9, 0.05, 0.5),
-		"intro_overlay":   Color(0.0, 0.02, 0.08, 0.88),
-		"whisper_text":    Color(0.3, 0.65, 0.95, 0.7),
-		"floor_text":      Color(0.45, 0.85, 1.0),
-		"boss_label":      Color(1.0, 0.15, 0.5),
-		"section_label":   Color(0.0, 0.75, 0.85, 0.8),
-		"dmg_lo":          Color(0.0, 0.95, 0.85),
-		"dmg_mid":         Color(0.9, 0.05, 0.5),
-		"dmg_hi":          Color(1.0, 0.3, 0.8),
-		"chain_flash":     Color(0.3, 1.0, 2.5),
-		"boss_pulse":      Color(1.0, 1.3, 1.5),
-		"corner_radius":   1,
-		"border_width":    2,
-	},
-	ThemeStyle.PIXEL: {
-		"bg_empty":        Color(0.12, 0.14, 0.10),
-		"bg_secondary":    Color(0.22, 0.24, 0.18),
-		"bg_void":         Color(0.05, 0.06, 0.04),
-		"border_default":  Color(0.30, 0.30, 0.22),
-		"border_strong":   Color(0.85, 0.75, 0.10),
-		"text_primary":    Color(0.88, 0.92, 0.70),
-		"text_secondary":  Color(0.65, 0.68, 0.48),
-		"text_accent":     Color(0.95, 0.88, 0.25),
-		"text_danger":     Color(0.95, 0.18, 0.10),
-		"text_heal":       Color(0.30, 0.90, 0.30),
-		"hud_bg":          Color(0.10, 0.11, 0.08, 0.95),
-		"boss_bar_bg":     Color(0.08, 0.08, 0.06),
-		"boss_bar_fill":   Color(0.75, 0.20, 0.05),
-		"boss_bar_brd":    Color(0.50, 0.45, 0.20),
-		"boss_hp_text":    Color(0.88, 0.85, 0.65),
-		"player_hp_text":  Color(0.30, 0.85, 0.25),
-		"btn_normal_bg":   Color(0.14, 0.15, 0.10),
-		"btn_normal_brd":  Color(0.38, 0.35, 0.22),
-		"btn_hover_bg":    Color(0.22, 0.24, 0.16),
-		"btn_end_bg":      Color(0.16, 0.17, 0.11),
-		"btn_end_brd":     Color(0.70, 0.60, 0.15),
-		"btn_end_hover":   Color(0.24, 0.26, 0.16),
-		"btn_end_hbrd":    Color(0.92, 0.80, 0.25),
-		"btn_end_text":    Color(0.95, 0.88, 0.35),
-		"explode_bg":      Color(0.95, 0.50, 0.05),
-		"explode_brd":     Color(1.0, 0.80, 0.0),
-		"mine_hidden":     Color(0.18, 0.20, 0.14),
-		"mine_hidden_brd": Color(0.32, 0.34, 0.24),
-		"mine_reveal":     Color(0.48, 0.50, 0.34),
-		"mine_reveal_brd": Color(0.38, 0.40, 0.28),
-		"boss_weak_brd":   Color(0.95, 0.85, 0.10),
-		"boss_armor_brd":  Color(0.40, 0.55, 0.30),
-		"boss_absorb_brd": Color(0.25, 0.70, 0.30),
-		"intro_overlay":   Color(0.04, 0.04, 0.02, 0.88),
-		"whisper_text":    Color(0.50, 0.55, 0.35, 0.7),
-		"floor_text":      Color(0.75, 0.72, 0.48),
-		"boss_label":      Color(0.95, 0.30, 0.15),
-		"section_label":   Color(0.60, 0.58, 0.38, 0.8),
-		"dmg_lo":          Color(0.95, 0.88, 0.20),
-		"dmg_mid":         Color(0.95, 0.55, 0.10),
-		"dmg_hi":          Color(0.95, 0.20, 0.05),
-		"chain_flash":     Color(0.6, 0.9, 2.0),
-		"boss_pulse":      Color(1.2, 1.15, 1.0),
+	ThemeStyle.NEON: {
+		"bg_empty":        Color(0.04, 0.03, 0.10),
+		"bg_secondary":    Color(0.08, 0.05, 0.18),
+		"bg_void":         Color(0.02, 0.01, 0.05),
+		"border_default":  Color(0.20, 0.10, 0.40),
+		"border_strong":   Color(1.0, 0.20, 0.80),
+		"text_primary":    Color(0.95, 0.90, 1.0),
+		"text_secondary":  Color(0.70, 0.55, 0.90),
+		"text_accent":     Color(1.0, 0.25, 0.85),
+		"text_danger":     Color(1.0, 0.20, 0.40),
+		"text_heal":       Color(0.0, 1.0, 0.65),
+		"hud_bg":          Color(0.03, 0.02, 0.08, 0.96),
+		"boss_bar_bg":     Color(0.04, 0.02, 0.10),
+		"boss_bar_fill":   Color(1.0, 0.15, 0.65),
+		"boss_bar_brd":    Color(0.0, 0.90, 1.0),
+		"boss_hp_text":    Color(0.90, 0.85, 1.0),
+		"player_hp_text":  Color(0.0, 1.0, 0.70),
+		"btn_normal_bg":   Color(0.06, 0.04, 0.14),
+		"btn_normal_brd":  Color(0.25, 0.12, 0.50),
+		"btn_hover_bg":    Color(0.12, 0.08, 0.28),
+		"btn_end_bg":      Color(0.08, 0.04, 0.18),
+		"btn_end_brd":     Color(1.0, 0.20, 0.80),
+		"btn_end_hover":   Color(0.14, 0.08, 0.32),
+		"btn_end_hbrd":    Color(0.0, 1.0, 1.0),
+		"btn_end_text":    Color(0.0, 1.0, 0.90),
+		"explode_bg":      Color(1.0, 0.15, 0.60),
+		"explode_brd":     Color(0.0, 1.0, 1.0),
+		"mine_hidden":     Color(0.10, 0.06, 0.22),
+		"mine_hidden_brd": Color(0.22, 0.12, 0.45),
+		"mine_reveal":     Color(0.03, 0.02, 0.08),
+		"mine_reveal_brd": Color(0.08, 0.04, 0.16),
+		"boss_weak_brd":   Color(0.0, 1.0, 0.85),
+		"boss_armor_brd":  Color(0.40, 0.30, 1.0),
+		"boss_absorb_brd": Color(1.0, 0.15, 0.60),
+		"intro_overlay":   Color(0.02, 0.01, 0.06, 0.88),
+		"whisper_text":    Color(0.50, 0.30, 0.90, 0.75),
+		"floor_text":      Color(0.70, 0.40, 1.0),
+		"boss_label":      Color(1.0, 0.20, 0.65),
+		"section_label":   Color(0.0, 0.85, 0.95, 0.85),
+		"dmg_lo":          Color(0.0, 1.0, 0.85),
+		"dmg_mid":         Color(1.0, 0.20, 0.65),
+		"dmg_hi":          Color(1.0, 0.40, 0.90),
+		"chain_flash":     Color(0.5, 1.0, 2.5),
+		"boss_pulse":      Color(1.2, 1.0, 1.4),
+		"blocked_bg":      Color(0.20, 0.04, 0.12),
+		"boss_dead_tint":  Color(0.15, 0.10, 0.25, 0.45),
+		"hp_bar_bg":       Color(0.03, 0.02, 0.06, 0.90),
+		"hp_bar_mid":      Color(0.0, 0.95, 0.90),
+		"preview_highlight": Color(0.8, 1.2, 1.5, 0.80),
+		"shadow_color":    Color(0, 0, 0.05, 0.70),
+		"card_shadow":     Color(0, 0.02, 0.10, 0.65),
+		"rarity_common":   Color(0.60, 0.50, 0.80),
+		"rarity_common_bg": Color(0.06, 0.04, 0.14),
+		"rarity_rare":     Color(0.0, 0.90, 1.0),
+		"rarity_rare_bg":  Color(0.04, 0.08, 0.20),
+		"rarity_epic":     Color(1.0, 0.15, 0.65),
+		"rarity_epic_bg":  Color(0.20, 0.04, 0.15),
+		"card_name_text":  Color(0.95, 0.90, 1.0),
+		"card_desc_text":  Color(0.70, 0.55, 0.90),
 		"corner_radius":   0,
-		"border_width":    3,
+		"border_width":    2,
 	},
 }
 
 # ── 数字颜色（扫雷1-8）也按主题分套 ───────────────────────────
 
 const NUMBER_COLORS_BY_THEME = {
-	ThemeStyle.DUNGEON: [
-		Color(0,0,0), Color(0.15,0.35,0.80), Color(0.12,0.55,0.22),
-		Color(0.80,0.15,0.12), Color(0.22,0.15,0.62), Color(0.62,0.12,0.12),
-		Color(0.12,0.50,0.55), Color(0.88,0.72,0.18), Color(0.55,0.38,0.18),
+	ThemeStyle.SAKURA: [
+		Color(0,0,0), Color(0.60,0.40,1.0), Color(0.40,0.80,0.50),
+		Color(1.0,0.30,0.45), Color(0.70,0.35,0.90), Color(0.90,0.25,0.35),
+		Color(0.50,0.70,0.90), Color(1.0,0.70,0.80), Color(0.80,0.50,0.65),
 	],
-	ThemeStyle.CYBER: [
-		Color(0,0,0), Color(0.0,0.85,0.95), Color(0.0,0.95,0.5),
-		Color(0.95,0.05,0.45), Color(0.6,0.2,1.0), Color(0.95,0.3,0.65),
-		Color(0.0,0.7,0.9), Color(0.95,0.85,0.0), Color(0.8,0.5,0.0),
+	ThemeStyle.STEAM: [
+		Color(0,0,0), Color(0.35,0.55,0.95), Color(0.25,0.75,0.35),
+		Color(0.95,0.30,0.15), Color(0.55,0.35,0.85), Color(0.85,0.22,0.15),
+		Color(0.25,0.70,0.75), Color(1.0,0.80,0.25), Color(0.75,0.50,0.20),
 	],
-	ThemeStyle.PIXEL: [
-		Color(0,0,0), Color(0.25,0.50,0.95), Color(0.18,0.72,0.25),
-		Color(0.92,0.18,0.10), Color(0.55,0.18,0.85), Color(0.80,0.14,0.14),
-		Color(0.15,0.65,0.70), Color(0.95,0.78,0.10), Color(0.65,0.40,0.14),
+	ThemeStyle.NEON: [
+		Color(0,0,0), Color(0.0,0.90,1.0), Color(0.0,1.0,0.60),
+		Color(1.0,0.15,0.55), Color(0.75,0.30,1.0), Color(1.0,0.35,0.75),
+		Color(0.0,0.80,0.90), Color(1.0,0.90,0.15), Color(0.90,0.50,0.0),
 	],
 }
 
@@ -239,6 +284,52 @@ func set_theme(t: int):
 func theme_name() -> String:
 	return THEME_NAMES[current_theme]
 
+# ── 主题纹理 (patterns) ──
+
+const THEME_FOLDER = {
+	ThemeStyle.SAKURA: "sakura",
+	ThemeStyle.STEAM:  "steam",
+	ThemeStyle.NEON:   "neon",
+}
+var _pattern_cache: Dictionary = {}
+
+func get_pattern(name: String) -> Texture2D:
+	var folder = THEME_FOLDER[current_theme]
+	var key = "%s/%s" % [folder, name]
+	if _pattern_cache.has(key):
+		return _pattern_cache[key]
+	var path = "res://assets/sprites/ui/patterns/%s/%s.png" % [folder, name]
+	var tex: Texture2D = null
+	if ResourceLoader.exists(path):
+		tex = load(path) as Texture2D
+	_pattern_cache[key] = tex
+	return tex
+
+# ── 主题素材 (themed sprites) ──
+var _themed_cache: Dictionary = {}
+
+func get_themed(name: String) -> Texture2D:
+	var folder = THEME_FOLDER[current_theme]
+	var key = "%s/%s" % [folder, name]
+	if _themed_cache.has(key):
+		return _themed_cache[key]
+	var path = "res://assets/sprites/ui/themed/%s/%s.png" % [folder, name]
+	var tex: Texture2D = null
+	if ResourceLoader.exists(path):
+		tex = load(path) as Texture2D
+	_themed_cache[key] = tex
+	return tex
+
+func make_themed_stylebox(name: String, fallback_bg: String = "", fallback_brd: String = "") -> StyleBox:
+	var tex = get_themed(name)
+	if tex:
+		var s = StyleBoxTexture.new()
+		s.texture = tex
+		return s
+	if fallback_bg != "":
+		return make_stylebox(fallback_bg, fallback_brd)
+	return null
+
 func make_stylebox(key_bg: String, key_brd: String, border_w: int = -1, corner_r: int = -1) -> StyleBoxFlat:
 	var s = StyleBoxFlat.new()
 	s.bg_color = color(key_bg)
@@ -259,4 +350,4 @@ func _save():
 func _load():
 	var cfg = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
-		current_theme = cfg.get_value("ui", "theme", ThemeStyle.DUNGEON)
+		current_theme = cfg.get_value("ui", "theme", ThemeStyle.SAKURA)

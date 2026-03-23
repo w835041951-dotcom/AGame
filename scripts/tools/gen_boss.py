@@ -1,713 +1,1309 @@
 """
-Boss 像素艺术生成器 v5 — 20种Boss独立纹理
-每个Boss一张atlas贴图，Cell.gd按local坐标裁切
+Boss 像素风精灵生成器 v6  —  20种Boss 大型有机轮廓风格
+使用 blob / glow / 有机多边形 绘制, 不按格子独立绘制
+每个Boss是一张大型 atlas 贴图, Cell.gd 按 local 坐标裁切
+使用 UI patterns (sakura主题) 作为Boss身体纹理装饰
 """
 import os, math, random
-from PIL import Image, ImageDraw, ImageFilter, ImageChops
+from PIL import Image, ImageDraw, ImageEnhance, ImageChops
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites", "boss")
 os.makedirs(OUT, exist_ok=True)
 
-SCALE = 6
-CELL_PX = 64  # 每格最终像素
+CELL = 64
+rng = random.Random(42)
 
-random.seed(42)
+# ── UI 主题纹路素材 ──────────────────────────────
+PATTERN_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "sprites", "ui", "patterns", "sakura")
+_pattern_cache = {}
 
-# ── 20种Boss的配色方案 ──
-BOSS_CONFIGS = {
-    # --- 第一幕 (1-5) ---
-    "gargoyle": {
-        "cols": 5, "rows": 4,
-        "shape": [(1,0),(3,0),(1,1),(2,1),(3,1),(1,2),(2,2),(3,2),(2,3)],
-        "body":  (72, 78, 85),    # 灰石色
-        "dark":  (35, 38, 42),
-        "crack": (40, 42, 48),
-        "glow":  (60, 255, 120),  # 绿色灵光
-        "eye":   (80, 255, 130),
-        "rune":  (60, 220, 100),
-        "accent":(50, 180, 80),
-    },
-    "spider": {
-        "cols": 5, "rows": 3,
-        "shape": [(1,0),(2,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),(1,2),(2,2),(3,2)],
-        "body":  (60, 45, 75),    # 暗紫色
-        "dark":  (30, 22, 40),
-        "crack": (40, 30, 50),
-        "glow":  (180, 60, 255),  # 紫色毒光
-        "eye":   (220, 50, 255),
-        "rune":  (160, 40, 220),
-        "accent":(120, 30, 180),
-    },
-    "serpent": {
-        "cols": 4, "rows": 4,
-        "shape": [(0,0),(1,0),(2,0),(3,0),(3,1),(0,2),(1,2),(2,2),(3,2),(0,3)],
-        "body":  (95, 55, 30),    # 熔岩橙棕
-        "dark":  (50, 25, 12),
-        "crack": (60, 30, 15),
-        "glow":  (255, 120, 20),  # 熔岩橙
-        "eye":   (255, 160, 40),
-        "rune":  (255, 100, 10),
-        "accent":(200, 80, 10),
-    },
-    "giant": {
-        "cols": 7, "rows": 5,
-        "shape": [(2,0),(3,0),(4,0),(1,1),(2,1),(3,1),(4,1),(5,1),(1,2),(2,2),(3,2),(4,2),(5,2),
-                  (0,3),(3,3),(6,3),(1,4),(3,4),(5,4)],
-        "body":  (85, 82, 70),    # 骨白色
-        "dark":  (42, 40, 35),
-        "crack": (50, 48, 42),
-        "glow":  (220, 200, 120), # 骨黄光
-        "eye":   (240, 220, 140),
-        "rune":  (200, 180, 100),
-        "accent":(160, 140, 80),
-    },
-    "demon": {
-        "cols": 6, "rows": 5,
-        "shape": [(0,0),(5,0),(0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(1,2),(2,2),(3,2),(4,2),
-                  (0,3),(1,3),(2,3),(3,3),(4,3),(5,3),(2,4),(3,4)],
-        "body":  (80, 25, 20),    # 深渊暗红
-        "dark":  (40, 10, 8),
-        "crack": (50, 15, 12),
-        "glow":  (255, 40, 30),   # 血红光
-        "eye":   (255, 60, 40),
-        "rune":  (220, 30, 20),
-        "accent":(180, 20, 15),
-    },
-    # --- 第二幕 (6-10) ---
-    "witch": {
-        "cols": 5, "rows": 5,
-        "shape": [(2,0),(1,1),(2,1),(3,1),(0,2),(1,2),(2,2),(3,2),(4,2),
-                  (1,3),(2,3),(3,3),(2,4)],
-        "body":  (160, 200, 230),  # 冰蓝色
-        "dark":  (60, 80, 110),
-        "crack": (80, 100, 130),
-        "glow":  (100, 200, 255),  # 冰霜光
-        "eye":   (140, 220, 255),
-        "rune":  (80, 180, 240),
-        "accent":(60, 150, 220),
-    },
-    "wyvern": {
-        "cols": 7, "rows": 3,
-        "shape": [(0,0),(3,0),(6,0),(0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),
-                  (1,2),(2,2),(3,2),(4,2),(5,2)],
-        "body":  (35, 80, 65),    # 暗翠绿
-        "dark":  (15, 40, 30),
-        "crack": (25, 50, 40),
-        "glow":  (0, 255, 180),   # 翠光
-        "eye":   (40, 255, 200),
-        "rune":  (0, 220, 150),
-        "accent":(0, 180, 120),
-    },
-    "kraken": {
-        "cols": 5, "rows": 4,
-        "shape": [(0,0),(2,0),(4,0),(1,1),(2,1),(3,1),
-                  (1,2),(2,2),(3,2),(0,3),(2,3),(4,3)],
-        "body":  (25, 40, 70),    # 深海蓝
-        "dark":  (10, 18, 35),
-        "crack": (15, 25, 45),
-        "glow":  (0, 150, 255),   # 深海光
-        "eye":   (40, 180, 255),
-        "rune":  (0, 120, 220),
-        "accent":(0, 100, 190),
-    },
-    "golem": {
-        "cols": 5, "rows": 4,
-        "shape": [(0,0),(1,0),(3,0),(4,0),(1,1),(2,1),(3,1),
-                  (1,2),(2,2),(3,2),(0,3),(1,3),(3,3),(4,3)],
-        "body":  (110, 115, 120),  # 钢铁灰
-        "dark":  (50, 52, 55),
-        "crack": (60, 62, 65),
-        "glow":  (255, 200, 80),   # 熔铁金
-        "eye":   (255, 220, 100),
-        "rune":  (230, 180, 60),
-        "accent":(200, 150, 40),
-    },
-    "wolf": {
-        "cols": 6, "rows": 5,
-        "shape": [(3,0),(2,1),(3,1),(4,1),(0,2),(1,2),(2,2),(3,2),(4,2),(5,2),
-                  (2,3),(3,3),(4,3),(3,4)],
-        "body":  (80, 25, 25),    # 暗血红
-        "dark":  (40, 10, 10),
-        "crack": (50, 15, 15),
-        "glow":  (255, 50, 50),   # 血光
-        "eye":   (255, 80, 60),
-        "rune":  (220, 40, 40),
-        "accent":(180, 30, 30),
-    },
-    # --- 第三幕 (11-15) ---
-    "titan": {
-        "cols": 7, "rows": 5,
-        "shape": [(0,0),(6,0),(0,1),(1,1),(5,1),(6,1),
-                  (0,2),(1,2),(2,2),(3,2),(4,2),(5,2),(6,2),
-                  (0,3),(1,3),(5,3),(6,3),(0,4),(6,4)],
-        "body":  (70, 80, 110),    # 雷暴蓝灰
-        "dark":  (30, 35, 55),
-        "crack": (40, 45, 65),
-        "glow":  (80, 180, 255),   # 电光蓝
-        "eye":   (120, 200, 255),
-        "rune":  (60, 160, 240),
-        "accent":(40, 140, 220),
-    },
-    "mushroom": {
-        "cols": 5, "rows": 5,
-        "shape": [(1,0),(2,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),
-                  (1,2),(2,2),(3,2),(2,3),(1,4),(2,4),(3,4)],
-        "body":  (60, 75, 35),    # 毒绿褐
-        "dark":  (28, 38, 15),
-        "crack": (35, 45, 20),
-        "glow":  (120, 255, 40),  # 毒光绿
-        "eye":   (150, 255, 60),
-        "rune":  (100, 220, 30),
-        "accent":(80, 190, 20),
-    },
-    "crystal": {
-        "cols": 5, "rows": 5,
-        "shape": [(1,0),(3,0),(0,1),(1,1),(2,1),(3,1),(4,1),(1,2),(2,2),(3,2),
-                  (0,3),(1,3),(2,3),(3,3),(4,3),(2,4)],
-        "body":  (40, 100, 110),   # 水晶青
-        "dark":  (15, 45, 50),
-        "crack": (25, 60, 65),
-        "glow":  (0, 255, 220),    # 水晶光
-        "eye":   (60, 255, 240),
-        "rune":  (0, 220, 190),
-        "accent":(0, 190, 160),
-    },
-    "assassin": {
-        "cols": 5, "rows": 5,
-        "shape": [(0,0),(4,0),(0,1),(1,1),(3,1),(4,1),
-                  (1,2),(2,2),(3,2),(0,3),(1,3),(3,3),(4,3),(0,4),(4,4)],
-        "body":  (40, 40, 45),    # 暗影灰
-        "dark":  (18, 18, 22),
-        "crack": (28, 28, 32),
-        "glow":  (200, 50, 255),  # 暗影紫
-        "eye":   (230, 80, 255),
-        "rune":  (180, 40, 230),
-        "accent":(150, 30, 200),
-    },
-    "phoenix": {
-        "cols": 7, "rows": 5,
-        "shape": [(0,0),(6,0),(0,1),(1,1),(5,1),(6,1),
-                  (1,2),(2,2),(3,2),(4,2),(5,2),(2,3),(3,3),(4,3),(3,4)],
-        "body":  (120, 80, 20),    # 火焰金棕
-        "dark":  (60, 35, 8),
-        "crack": (70, 45, 12),
-        "glow":  (255, 200, 40),   # 烈焰金
-        "eye":   (255, 220, 80),
-        "rune":  (255, 180, 30),
-        "accent":(230, 150, 20),
-    },
-    # --- 第四幕 (16-20) ---
-    "lich": {
-        "cols": 6, "rows": 5,
-        "shape": [(1,0),(2,0),(3,0),(4,0),(2,1),(3,1),
-                  (1,2),(2,2),(3,2),(4,2),(2,3),(3,3),
-                  (1,4),(2,4),(3,4),(4,4)],
-        "body":  (40, 60, 35),    # 亡灵绿
-        "dark":  (18, 30, 15),
-        "crack": (25, 38, 20),
-        "glow":  (100, 255, 80),  # 魂火绿
-        "eye":   (130, 255, 100),
-        "rune":  (80, 230, 60),
-        "accent":(60, 200, 40),
-    },
-    "void": {
-        "cols": 5, "rows": 5,
-        "shape": [(0,0),(2,0),(4,0),(1,1),(2,1),(3,1),
-                  (0,2),(1,2),(2,2),(3,2),(4,2),(1,3),(2,3),(3,3),
-                  (0,4),(4,4)],
-        "body":  (50, 20, 70),    # 虚空紫
-        "dark":  (22, 8, 30),
-        "crack": (30, 12, 40),
-        "glow":  (180, 80, 255),  # 虚空光
-        "eye":   (210, 110, 255),
-        "rune":  (160, 60, 230),
-        "accent":(130, 40, 200),
-    },
-    "eagle": {
-        "cols": 8, "rows": 4,
-        "shape": [(0,0),(3,0),(4,0),(7,0),
-                  (0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),(7,1),
-                  (1,2),(2,2),(3,2),(4,2),(5,2),(6,2),(3,3),(4,3)],
-        "body":  (90, 95, 105),    # 暴风灰白
-        "dark":  (40, 42, 48),
-        "crack": (50, 52, 58),
-        "glow":  (200, 220, 255),  # 风暴白光
-        "eye":   (220, 235, 255),
-        "rune":  (180, 200, 240),
-        "accent":(150, 170, 220),
-    },
-    "chaos": {
-        "cols": 7, "rows": 5,
-        "shape": [(0,0),(3,0),(6,0),(1,1),(2,1),(3,1),(4,1),(5,1),
-                  (2,2),(3,2),(4,2),(1,3),(2,3),(3,3),(4,3),(5,3),
-                  (0,4),(3,4),(6,4)],
-        "body":  (65, 15, 15),    # 混沌暗赤
-        "dark":  (30, 5, 5),
-        "crack": (40, 8, 8),
-        "glow":  (255, 40, 60),   # 混沌赤光
-        "eye":   (255, 70, 80),
-        "rune":  (230, 30, 50),
-        "accent":(200, 20, 40),
-    },
-    "enddragon": {
-        "cols": 8, "rows": 4,
-        "shape": [(1,0),(2,0),(5,0),(6,0),
-                  (0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),(7,1),
-                  (1,2),(2,2),(3,2),(4,2),(5,2),(6,2),
-                  (2,3),(3,3),(4,3),(5,3)],
-        "body":  (85, 70, 30),    # 古龙暗金
-        "dark":  (40, 32, 12),
-        "crack": (50, 40, 16),
-        "glow":  (255, 220, 100),  # 古龙金光
-        "eye":   (255, 240, 130),
-        "rune":  (230, 200, 80),
-        "accent":(200, 170, 60),
-    },
+def _load_pattern(name):
+    """加载 sakura 主题的纹路 PNG 并缓存"""
+    if name in _pattern_cache:
+        return _pattern_cache[name]
+    path = os.path.join(PATTERN_DIR, name)
+    if os.path.exists(path):
+        img = Image.open(path).convert("RGBA")
+        _pattern_cache[name] = img
+        return img
+    return None
+
+def tile_pattern(pat, w, h):
+    """将小纹路图平铺到 w×h 大小"""
+    pw, ph = pat.size
+    tiled = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    for ty in range(0, h, ph):
+        for tx in range(0, w, pw):
+            tiled.paste(pat, (tx, ty))
+    return tiled.crop((0, 0, w, h))
+
+def tint_pattern(pat, color, alpha=80):
+    """对纹路重新着色: 取纹路亮度作为蒙版, 用 color 着色并设透明度"""
+    pat = pat.convert("RGBA")
+    r, g, b = color[:3]
+    w, h = pat.size
+    px = pat.load()
+    result = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    rpx = result.load()
+    for y in range(h):
+        for x in range(w):
+            pr, pg, pb, pa = px[x, y]
+            if pa < 10:
+                continue
+            brightness = (pr + pg + pb) / (3 * 255.0)
+            a = int(alpha * brightness * (pa / 255.0))
+            rpx[x, y] = (r, g, b, min(255, a))
+    return result
+
+def overlay_pattern(img, pattern_name, cx, cy, rx, ry, color, alpha=70):
+    """在 img 的椭圆区域(cx,cy,rx,ry)内叠加纹路装饰"""
+    pat = _load_pattern(pattern_name)
+    if pat is None:
+        return
+    region_w = rx * 2
+    region_h = ry * 2
+    if region_w < 8 or region_h < 8:
+        return
+    tiled = tile_pattern(pat, region_w, region_h)
+    tinted = tint_pattern(tiled, color, alpha)
+    # 用椭圆蒙版裁切
+    mask = Image.new("L", (region_w, region_h), 0)
+    md = ImageDraw.Draw(mask)
+    md.ellipse([0, 0, region_w - 1, region_h - 1], fill=255)
+    tinted.putalpha(ImageChops.multiply(tinted.split()[3], mask))
+    paste_x = cx - rx
+    paste_y = cy - ry
+    img.paste(Image.alpha_composite(
+        img.crop((paste_x, paste_y, paste_x + region_w, paste_y + region_h)).convert("RGBA"),
+        tinted
+    ), (paste_x, paste_y))
+
+def overlay_pattern_rect(img, pattern_name, x0, y0, w, h, color, alpha=60):
+    """在矩形区域内叠加纹路装饰"""
+    pat = _load_pattern(pattern_name)
+    if pat is None:
+        return
+    if w < 8 or h < 8:
+        return
+    tiled = tile_pattern(pat, w, h)
+    tinted = tint_pattern(tiled, color, alpha)
+    region = img.crop((x0, y0, x0 + w, y0 + h)).convert("RGBA")
+    composited = Image.alpha_composite(region, tinted)
+    img.paste(composited, (x0, y0))
+
+def overlay_border(img, border_name, x0, y0, w, h, alpha=50):
+    """在区域边缘叠加边框纹路"""
+    pat = _load_pattern(border_name)
+    if pat is None:
+        return
+    pw, ph = pat.size
+    # 上边
+    for tx in range(x0, x0 + w, pw):
+        rw = min(pw, x0 + w - tx)
+        piece = pat.crop((0, 0, rw, ph)).copy()
+        px_data = piece.load()
+        for py in range(ph):
+            for px_x in range(rw):
+                r, g, b, a = px_data[px_x, py]
+                px_data[px_x, py] = (r, g, b, min(255, int(a * alpha / 100)))
+        img.paste(Image.alpha_composite(
+            img.crop((tx, y0, tx + rw, y0 + ph)).convert("RGBA"),
+            piece
+        ), (tx, y0))
+
+# ── 通用绘图工具 (与 generate_boss_sprites.py 一致) ──
+
+def canvas(wc, hc, bg=(10, 6, 16, 255)):
+    return Image.new("RGBA", (wc * CELL, hc * CELL), bg)
+
+def cxy(img):
+    w, h = img.size
+    return w // 2, h // 2
+
+def glow(img, cx, cy, r_out, r_in, col_out, col_in, steps=30):
+    draw = ImageDraw.Draw(img)
+    for i in range(steps, -1, -1):
+        t = i / steps
+        r = int(r_in + (r_out - r_in) * t)
+        a_out = col_out[3] if len(col_out) > 3 else 255
+        a_in  = col_in[3]  if len(col_in)  > 3 else 255
+        a = int(a_out + (a_in - a_out) * (1 - t))
+        c = tuple(int(col_out[k] + (col_in[k] - col_out[k]) * (1 - t)) for k in range(3)) + (a,)
+        draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=c)
+
+def noise(img, intensity=15):
+    px = img.load()
+    w, h = img.size
+    for _ in range(w * h // 8):
+        x = rng.randint(0, w-1); y = rng.randint(0, h-1)
+        r, g, b, a = px[x, y]
+        if a < 40: continue
+        d = rng.randint(-intensity, intensity)
+        px[x, y] = (max(0,min(255,r+d)), max(0,min(255,g+d)), max(0,min(255,b+d)), a)
+
+def grid_lines(img, wc, hc):
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    for c in range(1, wc):
+        draw.line([(c*CELL,0),(c*CELL,h-1)], fill=(255,255,255,18))
+    for r in range(1, hc):
+        draw.line([(0,r*CELL),(w-1,r*CELL)], fill=(255,255,255,18))
+
+def eye(draw, cx, cy, r, iris, pupil):
+    draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=iris)
+    pr = max(2, r//2)
+    draw.ellipse([cx-pr, cy-pr, cx+pr, cy+pr], fill=pupil)
+    hl = max(1, pr//2)
+    draw.ellipse([cx-r+2, cy-r+2, cx-r+2+hl, cy-r+2+hl], fill=(255,255,255,200))
+
+def teeth_row(draw, x0, y0, x1, count, th, tw, col, pointy=True):
+    gap = (x1 - x0) // max(1, count)
+    for i in range(count):
+        tx = x0 + i * gap + gap // 4
+        if pointy:
+            draw.polygon([(tx, y0), (tx + tw, y0), (tx + tw // 2, y0 + th)], fill=col)
+        else:
+            draw.rectangle([tx, y0, tx + tw, y0 + th], fill=col)
+
+def blob(draw, cx, cy, rx, ry, col, bumps=8, bump_size=0.18):
+    pts = []
+    for i in range(36):
+        a = math.radians(i * 10)
+        noise_r = 1.0 + bump_size * math.sin(a * bumps + rng.uniform(0, math.pi))
+        px = cx + int(math.cos(a) * rx * noise_r)
+        py = cy + int(math.sin(a) * ry * noise_r)
+        pts.append((px, py))
+    draw.polygon(pts, fill=col)
+
+def save(img, wc, hc, path):
+    grid_lines(img, wc, hc)
+    noise(img)
+    img.save(path)
+    name = os.path.basename(path)
+    print(f"  saved {name}  ({img.size[0]}x{img.size[1]})")
+
+# ── 20 个 Boss 生成器 ──────────────────────────────
+
+def gen_gargoyle(path):
+    """5x4 — 石像鬼: 蝙蝠翼石兽"""
+    W, H = 5, 4
+    img = canvas(W, H, (12, 14, 16, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.55), 150, 40, (0,20,0,0), (30,80,50,150))
+    d = ImageDraw.Draw(img)
+    body = (72, 78, 85, 252)
+    dark = (40, 44, 50, 248)
+    wing = (55, 60, 68, 220)
+    glow_c = (60, 255, 120, 255)
+    # wings
+    for s in [-1, 1]:
+        pts = [(cx+s*int(Wp*0.12), int(Hp*0.35)),
+               (cx+s*int(Wp*0.48), int(Hp*0.08)),
+               (cx+s*int(Wp*0.48), int(Hp*0.55)),
+               (cx+s*int(Wp*0.20), int(Hp*0.60))]
+        d.polygon(pts, fill=wing)
+        for k in range(1,4):
+            t=k/4
+            fx=int(pts[1][0]+(pts[2][0]-pts[1][0])*t)
+            fy=int(pts[1][1]+(pts[2][1]-pts[1][1])*t)
+            d.line([pts[0],( fx, fy)], fill=(50,55,62,180), width=2)
+    # body
+    blob(d, cx, int(Hp*0.55), int(Wp*0.28), int(Hp*0.28), body, bumps=7, bump_size=0.14)
+    blob(d, cx, int(Hp*0.50), int(Wp*0.20), int(Hp*0.20), dark, bumps=5, bump_size=0.10)
+    # head
+    hcx, hcy = cx, int(Hp*0.22)
+    hrx, hry = int(Wp*0.20), int(Hp*0.18)
+    blob(d, hcx, hcy, hrx, hry, body, bumps=6, bump_size=0.12)
+    # horns
+    for ox in [-int(hrx*0.6), int(hrx*0.6)]:
+        d.polygon([(hcx+ox-5,hcy-hry+6),(hcx+ox+5,hcy-hry+6),(hcx+ox,max(2,hcy-hry-18))], fill=dark)
+    # eyes
+    ey = hcy - int(hry*0.08)
+    eye(d, hcx-int(hrx*0.38), ey, 8, glow_c, (20,80,40,255))
+    eye(d, hcx+int(hrx*0.38), ey, 8, glow_c, (20,80,40,255))
+    # mouth
+    my = hcy + int(hry*0.45)
+    d.arc([hcx-int(hrx*0.45),my-8,hcx+int(hrx*0.45),my+8], 0,180, fill=dark, width=3)
+    teeth_row(d, hcx-int(hrx*0.35), my-6, hcx+int(hrx*0.35), 4, 6, 6, (180,185,190,240))
+    # tail
+    tail_pts = [(cx, int(Hp*0.78)), (cx-int(Wp*0.05), int(Hp*0.88)), (cx+int(Wp*0.02), int(Hp*0.95))]
+    for i in range(len(tail_pts)-1):
+        d.line([tail_pts[i], tail_pts[i+1]], fill=dark, width=4)
+    # cracks
+    for _ in range(8):
+        crx=rng.randint(int(Wp*0.15),int(Wp*0.85)); cry=rng.randint(int(Hp*0.30),int(Hp*0.80))
+        d.line([(crx,cry),(crx+rng.randint(-14,14),cry+rng.randint(6,16))], fill=(35,38,42,180), width=2)
+    # UI纹路: 凯尔特结 — 石像鬼的古老石纹
+    overlay_pattern(img, "pattern_celtic.png", cx, int(Hp*0.55), int(Wp*0.26), int(Hp*0.26), (72,78,85), alpha=55)
+    overlay_pattern_rect(img, "border_rune.png", int(Wp*0.05), int(Hp*0.05), int(Wp*0.90), int(Hp*0.90), (60,255,120), alpha=30)
+    save(img, W, H, path)
+
+
+def gen_spider(path):
+    """5x4 — 影蛛: 紫色蜘蛛形"""
+    W, H = 5, 4
+    img = canvas(W, H, (10, 6, 16, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 140, 40, (20,0,30,0), (80,30,120,150))
+    d = ImageDraw.Draw(img)
+    body = (60, 45, 85, 252)
+    dark = (35, 25, 50, 248)
+    leg_c = (50, 35, 70, 230)
+    eye_c = (220, 50, 255, 255)
+    # 8 legs
+    angles_l = [155,135,200,220]
+    angles_r = [25,45,340,320]
+    for ang in angles_l + angles_r:
+        rad = math.radians(ang)
+        sx = cx + int(math.cos(rad)*int(Wp*0.14))
+        sy = int(Hp*0.48) + int(math.sin(rad)*int(Hp*0.10))
+        mid_x = cx + int(math.cos(rad)*int(Wp*0.30))
+        mid_y = int(Hp*0.48) + int(math.sin(rad)*int(Hp*0.22))
+        ex = max(4,min(Wp-4, cx+int(math.cos(rad)*int(Wp*0.46))))
+        ey2 = max(4,min(Hp-4, int(Hp*0.48)+int(math.sin(rad)*int(Hp*0.38))))
+        d.line([(sx,sy),(mid_x,mid_y)], fill=leg_c, width=5)
+        d.line([(mid_x,mid_y),(ex,ey2)], fill=leg_c, width=3)
+    # abdomen
+    blob(d, cx, int(Hp*0.62), int(Wp*0.26), int(Hp*0.22), body, bumps=8, bump_size=0.16)
+    blob(d, cx, int(Hp*0.60), int(Wp*0.18), int(Hp*0.15), dark, bumps=6, bump_size=0.10)
+    # cephalothorax
+    blob(d, cx, int(Hp*0.35), int(Wp*0.20), int(Hp*0.18), body, bumps=6, bump_size=0.12)
+    # 6 eyes (3 pairs)
+    for i, (ox, oy, r) in enumerate([(-12,-6,7),(12,-6,7),(-8,4,5),(8,4,5),(-16,0,4),(16,0,4)]):
+        eye(d, cx+ox, int(Hp*0.30)+oy, r, eye_c, (120,20,160,255))
+    # fangs
+    for s in [-1, 1]:
+        fx = cx + s*int(Wp*0.06)
+        d.polygon([(fx-3,int(Hp*0.42)),(fx+3,int(Hp*0.42)),(fx,int(Hp*0.52))], fill=(180,160,200,240))
+    # abdomen pattern
+    for i in range(4):
+        py = int(Hp*0.55) + i*int(Hp*0.05)
+        blob(d, cx, py, int(Wp*0.06)-i*2, 4, (80,50,110,120))
+    # UI纹路: 编织纹 — 蜘蛛丝网感
+    overlay_pattern(img, "pattern_weave.png", cx, int(Hp*0.62), int(Wp*0.24), int(Hp*0.20), (80,50,110), alpha=50)
+    overlay_pattern(img, "pattern_spiral.png", cx, int(Hp*0.35), int(Wp*0.18), int(Hp*0.16), (220,50,255), alpha=35)
+    save(img, W, H, path)
+
+
+def gen_serpent(path):
+    """6x4 — 熔岩巨蛇: S形蜿蜒"""
+    W, H = 6, 4
+    img = canvas(W, H, (16, 8, 4, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 180, 50, (50,15,0,0), (160,60,8,155))
+    d = ImageDraw.Draw(img)
+    body = (120, 55, 20, 252)
+    dark = (70, 30, 10, 248)
+    lava = (255, 120, 20, 240)
+    # S-curve body segments
+    spine = [(int(Wp*0.82),int(Hp*0.15)), (int(Wp*0.65),int(Hp*0.25)),
+             (int(Wp*0.45),int(Hp*0.35)), (int(Wp*0.30),int(Hp*0.50)),
+             (int(Wp*0.20),int(Hp*0.65)), (int(Wp*0.35),int(Hp*0.78)),
+             (int(Wp*0.55),int(Hp*0.85)), (int(Wp*0.70),int(Hp*0.90))]
+    for i, (sx, sy) in enumerate(spine):
+        r = max(12, 30 - i*2)
+        blob(d, sx, sy, r+8, r, body, bumps=6, bump_size=0.12)
+    for i, (sx, sy) in enumerate(spine):
+        r = max(8, 22 - i*2)
+        blob(d, sx, sy, r+4, r, dark, bumps=5, bump_size=0.08)
+    # head
+    hcx, hcy = int(Wp*0.82), int(Hp*0.15)
+    hrx, hry = int(Wp*0.14), int(Hp*0.14)
+    blob(d, hcx, hcy, hrx, hry, body, bumps=6, bump_size=0.10)
+    # eyes
+    eye(d, hcx-int(hrx*0.40), hcy-int(hry*0.15), 7, lava, (60,25,5,255))
+    eye(d, hcx+int(hrx*0.40), hcy-int(hry*0.15), 7, lava, (60,25,5,255))
+    # mouth
+    my = hcy + int(hry*0.50)
+    d.line([(hcx-int(hrx*0.55),my),(hcx+int(hrx*0.55),my)], fill=(40,15,5,220), width=3)
+    teeth_row(d, hcx-int(hrx*0.45), my-6, hcx+int(hrx*0.45), 4, 6, 5, (220,200,180,240))
+    # lava glow between segments
+    for i in range(len(spine)-1):
+        mx = (spine[i][0]+spine[i+1][0])//2
+        my2 = (spine[i][1]+spine[i+1][1])//2
+        blob(d, mx, my2, 8, 6, lava, bumps=4, bump_size=0.20)
+    # tail tip
+    tx, ty = spine[-1]
+    d.polygon([(tx,ty-6),(tx+18,ty),(tx,ty+6)], fill=dark)
+    # scales
+    for _ in range(35):
+        sx=rng.randint(int(Wp*0.10),int(Wp*0.90))
+        sy=rng.randint(int(Hp*0.10),int(Hp*0.92))
+        d.arc([sx-5,sy-3,sx+5,sy+3],180,360,fill=(160,70,20,110),width=2)
+    # UI纹路: 龙鳞纹 — 蛇身鳞片
+    overlay_pattern_rect(img, "pattern_scale.png", int(Wp*0.15), int(Hp*0.15), int(Wp*0.70), int(Hp*0.70), (160,70,20), alpha=50)
+    save(img, W, H, path)
+
+
+def gen_giant(path):
+    """7x5 — 骸骨巨人: 巨大骷髅战士"""
+    W, H = 7, 5
+    img = canvas(W, H, (10, 10, 8, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 220, 60, (30,25,0,0), (100,90,40,150))
+    d = ImageDraw.Draw(img)
+    bone = (200, 195, 178, 252)
+    dark = (85, 82, 70, 248)
+    glow_c = (220, 200, 120, 255)
+    # ribcage torso
+    blob(d, cx, int(Hp*0.55), int(Wp*0.28), int(Hp*0.26), dark, bumps=7, bump_size=0.12)
+    for i in range(5):
+        ry = int(Hp*0.42) + i*int(Hp*0.06)
+        rw = int(Wp*0.24) - abs(i-2)*int(Wp*0.03)
+        d.arc([cx-rw,ry-6,cx+rw,ry+6], 0, 180, fill=bone, width=3)
+    # shoulders
+    for s in [-1, 1]:
+        blob(d, cx+s*int(Wp*0.28), int(Hp*0.32), int(Wp*0.10), int(Hp*0.08), bone, bumps=5, bump_size=0.14)
+    # arms
+    for s in [-1, 1]:
+        ax = cx+s*int(Wp*0.36)
+        d.line([(cx+s*int(Wp*0.28),int(Hp*0.36)),(ax,int(Hp*0.62))], fill=bone, width=6)
+        blob(d, ax, int(Hp*0.64), 12, 10, bone, bumps=5, bump_size=0.20)
+    # pelvis + legs
+    blob(d, cx, int(Hp*0.72), int(Wp*0.16), int(Hp*0.08), dark, bumps=5, bump_size=0.10)
+    for s in [-1, 1]:
+        lx = cx + s*int(Wp*0.12)
+        d.line([(lx,int(Hp*0.76)),(lx+s*int(Wp*0.04),int(Hp*0.94))], fill=bone, width=5)
+    # skull head
+    hcx, hcy = cx, int(Hp*0.16)
+    hrx, hry = int(Wp*0.16), int(Hp*0.15)
+    blob(d, hcx, hcy, hrx, hry, bone, bumps=6, bump_size=0.10)
+    blob(d, hcx, hcy+int(hry*0.25), int(hrx*0.75), int(hry*0.55), (170,165,150,240), bumps=4, bump_size=0.06)
+    # eye sockets
+    ey = hcy - int(hry*0.05)
+    for s in [-1, 1]:
+        ex = hcx + s*int(hrx*0.35)
+        d.ellipse([ex-8,ey-6,ex+8,ey+6], fill=(20,18,15,240))
+        eye(d, ex, ey, 5, glow_c, (255,240,160,255))
+    # jaw
+    jy = hcy + int(hry*0.55)
+    d.line([(hcx-int(hrx*0.45),jy),(hcx+int(hrx*0.45),jy)], fill=(30,28,22,220), width=3)
+    teeth_row(d, hcx-int(hrx*0.38), jy-6, hcx+int(hrx*0.38), 5, 7, 6, bone)
+    # UI纹路: 锯齿纹 — 骨骼战士粗犷纹路
+    overlay_pattern(img, "pattern_zigzag.png", cx, int(Hp*0.50), int(Wp*0.25), int(Hp*0.24), (200,190,150), alpha=45)
+    overlay_pattern_rect(img, "border_rune.png", int(Wp*0.08), int(Hp*0.08), int(Wp*0.84), int(Hp*0.84), (200,190,150), alpha=25)
+    save(img, W, H, path)
+
+
+def gen_demon(path):
+    """6x5 — 深渊魔王: 带翼恶魔"""
+    W, H = 6, 5
+    img = canvas(W, H, (14, 4, 4, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 200, 55, (50,5,0,0), (180,30,10,160))
+    d = ImageDraw.Draw(img)
+    body = (100, 25, 18, 252)
+    dark = (50, 12, 8, 248)
+    fire = (255, 60, 30, 240)
+    # demon wings
+    for s in [-1, 1]:
+        pts = [(cx+s*int(Wp*0.18),int(Hp*0.35)),
+               (cx+s*int(Wp*0.48),int(Hp*0.06)),
+               (cx+s*int(Wp*0.48),int(Hp*0.58)),
+               (cx+s*int(Wp*0.22),int(Hp*0.55))]
+        d.polygon(pts, fill=(70,15,10,215))
+        for k in range(1,4):
+            t=k/4; fx=int(pts[1][0]+(pts[2][0]-pts[1][0])*t); fy=int(pts[1][1]+(pts[2][1]-pts[1][1])*t)
+            d.line([pts[0],(fx,fy)], fill=(90,20,12,160), width=2)
+    # body
+    blob(d, cx, int(Hp*0.58), int(Wp*0.30), int(Hp*0.28), body, bumps=7, bump_size=0.14)
+    blob(d, cx, int(Hp*0.54), int(Wp*0.22), int(Hp*0.20), dark, bumps=5, bump_size=0.10)
+    # legs
+    for s in [-1, 1]:
+        blob(d, cx+s*int(Wp*0.16), int(Hp*0.84), int(Wp*0.08), int(Hp*0.12), dark, bumps=5, bump_size=0.14)
+    # head
+    hcx, hcy = cx, int(Hp*0.20)
+    hrx, hry = int(Wp*0.18), int(Hp*0.16)
+    blob(d, hcx, hcy, hrx, hry, body, bumps=6, bump_size=0.12)
+    # horns
+    for s in [-1, 1]:
+        bx = hcx + s*int(hrx*0.6)
+        tip_x = bx + s*16
+        d.polygon([(bx-5,hcy-hry+5),(bx+5,hcy-hry+5),(tip_x,max(2,hcy-hry-28))], fill=(60,15,8,255))
+    # eyes
+    ey = hcy - int(hry*0.05)
+    eye(d, hcx-int(hrx*0.38), ey, 9, fire, (80,15,5,255))
+    eye(d, hcx+int(hrx*0.38), ey, 9, fire, (80,15,5,255))
+    # mouth
+    my = hcy + int(hry*0.50)
+    d.arc([hcx-int(hrx*0.50),my-10,hcx+int(hrx*0.50),my+10], 0,180, fill=(30,8,4,220), width=4)
+    teeth_row(d, hcx-int(hrx*0.40), my-7, hcx+int(hrx*0.40), 5, 8, 7, (220,180,160,240))
+    # fire aura
+    for _ in range(15):
+        fx=rng.randint(int(Wp*0.10),int(Wp*0.90)); fy=rng.randint(int(Hp*0.20),int(Hp*0.85))
+        blob(d, fx, fy, rng.randint(4,10), rng.randint(3,8), (255,80,20,100))
+    # UI纹路: 希腊回纹 — 恶魔仪式纹
+    overlay_pattern(img, "pattern_greek_key.png", cx, int(Hp*0.58), int(Wp*0.28), int(Hp*0.22), (200,40,20), alpha=50)
+    overlay_pattern_rect(img, "divider_chain.png", int(Wp*0.10), int(Hp*0.45), int(Wp*0.80), 20, (255,80,20), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_witch(path):
+    """5x5 — 冰霜女巫: 猫头鹰形冰法师"""
+    W, H = 5, 5
+    img = canvas(W, H, (6, 10, 18, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 170, 45, (0,15,40,0), (40,100,200,155))
+    d = ImageDraw.Draw(img)
+    robe = (90, 130, 180, 250)
+    dark = (50, 70, 110, 248)
+    ice  = (160, 220, 255, 235)
+    # robe body
+    robe_pts = [(cx-int(Wp*0.44),int(Hp*0.92)), (cx+int(Wp*0.44),int(Hp*0.92)),
+                (cx+int(Wp*0.28),int(Hp*0.55)), (cx+int(Wp*0.18),int(Hp*0.28)),
+                (cx-int(Wp*0.18),int(Hp*0.28)), (cx-int(Wp*0.28),int(Hp*0.55))]
+    d.polygon(robe_pts, fill=dark)
+    blob(d, cx, int(Hp*0.58), int(Wp*0.26), int(Hp*0.26), robe, bumps=6, bump_size=0.08)
+    # owl-like head
+    hcx, hcy = cx, int(Hp*0.18)
+    hrx, hry = int(Wp*0.22), int(Hp*0.16)
+    blob(d, hcx, hcy, hrx, hry, robe, bumps=6, bump_size=0.10)
+    # ear tufts
+    for s in [-1, 1]:
+        d.polygon([(hcx+s*int(hrx*0.55),hcy-hry+6),(hcx+s*int(hrx*0.70),hcy-hry+4),
+                   (hcx+s*int(hrx*0.45),max(2,hcy-hry-22))], fill=dark)
+    # large owl eyes
+    for s in [-1, 1]:
+        ex = hcx + s*int(hrx*0.36)
+        ey = hcy - int(hry*0.05)
+        d.ellipse([ex-12,ey-10,ex+12,ey+10], fill=(30,45,70,255))
+        eye(d, ex, ey, 9, ice, (40,80,140,255))
+    # beak
+    by = hcy + int(hry*0.40)
+    d.polygon([(hcx-8,by-4),(hcx+8,by-4),(hcx,by+10)], fill=(140,170,200,245))
+    # ice crystal staff
+    sx = cx - int(Wp*0.30)
+    d.line([(sx,int(Hp*0.30)),(sx,int(Hp*0.88))], fill=(120,150,190,230), width=4)
+    for i in range(3):
+        cy2 = int(Hp*0.30) - i*14
+        d.polygon([(sx-6,cy2),(sx+6,cy2),(sx,max(2,cy2-16))], fill=ice)
+    # frost particles
+    for _ in range(12):
+        fx=rng.randint(6,Wp-6); fy=rng.randint(6,Hp-6)
+        blob(d, fx, fy, rng.randint(3,7), rng.randint(2,5), (180,220,255,80))
+    # UI纹路: 菱形编织 — 冰晶结构纹
+    overlay_pattern(img, "pattern_diamond.png", cx, int(Hp*0.52), int(Wp*0.22), int(Hp*0.24), (140,190,240), alpha=50)
+    overlay_pattern_rect(img, "divider_wave.png", int(Wp*0.08), int(Hp*0.82), int(Wp*0.84), 16, (180,220,255), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_wyvern(path):
+    """7x4 — 暗夜飞龙: 展翅龙"""
+    W, H = 7, 4
+    img = canvas(W, H, (4, 12, 10, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 210, 55, (0,30,20,0), (10,100,70,155))
+    d = ImageDraw.Draw(img)
+    body = (30, 90, 70, 252)
+    dark = (15, 55, 40, 248)
+    glow_c = (40, 255, 180, 255)
+    # wings
+    for s in [-1, 1]:
+        pts = [(cx+s*int(Wp*0.10),int(Hp*0.40)),
+               (cx+s*int(Wp*0.48),int(Hp*0.05)),
+               (cx+s*int(Wp*0.48),int(Hp*0.60)),
+               (cx+s*int(Wp*0.16),int(Hp*0.56))]
+        d.polygon(pts, fill=(20,65,48,215))
+        for k in range(1,5):
+            t=k/5; fx=int(pts[1][0]+(pts[2][0]-pts[1][0])*t); fy=int(pts[1][1]+(pts[2][1]-pts[1][1])*t)
+            d.line([pts[0],(fx,fy)], fill=(25,75,55,160), width=2)
+    # body
+    blob(d, cx, int(Hp*0.52), int(Wp*0.18), int(Hp*0.25), body, bumps=6, bump_size=0.12)
+    # neck
+    d.polygon([(cx-int(Wp*0.05),int(Hp*0.35)),(cx+int(Wp*0.05),int(Hp*0.35)),
+               (cx+int(Wp*0.04),int(Hp*0.18)),(cx-int(Wp*0.04),int(Hp*0.18))], fill=body)
+    # head
+    hcx, hcy = cx, int(Hp*0.12)
+    hrx, hry = int(Wp*0.10), int(Hp*0.11)
+    blob(d, hcx, hcy, hrx, hry, body, bumps=5, bump_size=0.10)
+    # horns
+    for s in [-1, 1]:
+        d.polygon([(hcx+s*int(hrx*0.55),hcy-hry+4),(hcx+s*int(hrx*0.65),hcy-hry+2),
+                   (hcx+s*int(hrx*0.40)+s*10,max(2,hcy-hry-16))], fill=dark)
+    eye(d, hcx-int(hrx*0.40), hcy, 5, glow_c, (10,60,40,255))
+    eye(d, hcx+int(hrx*0.40), hcy, 5, glow_c, (10,60,40,255))
+    # jaw
+    my = hcy + int(hry*0.55)
+    d.line([(hcx-int(hrx*0.50),my),(hcx+int(hrx*0.50),my)], fill=(8,30,22,220), width=2)
+    teeth_row(d, hcx-int(hrx*0.40), my-5, hcx+int(hrx*0.40), 3, 5, 5, (200,210,200,240))
+    # tail
+    tail_pts = [(cx,int(Hp*0.72)),(cx-int(Wp*0.06),int(Hp*0.85)),(cx-int(Wp*0.10),int(Hp*0.94))]
+    for i in range(len(tail_pts)-1):
+        d.line([tail_pts[i],tail_pts[i+1]], fill=dark, width=max(2,5-i*2))
+    # scales
+    for _ in range(30):
+        sx=rng.randint(int(Wp*0.10),int(Wp*0.90)); sy=rng.randint(int(Hp*0.20),int(Hp*0.80))
+        d.arc([sx-4,sy-2,sx+4,sy+2],180,360,fill=(45,120,90,110),width=2)
+    # UI纹路: 龙鳞纹 — 飞龙鳞甲
+    overlay_pattern(img, "pattern_scale.png", cx, int(Hp*0.48), int(Wp*0.22), int(Hp*0.22), (40,120,80), alpha=50)
+    overlay_pattern_rect(img, "pattern_zigzag.png", int(Wp*0.08), int(Hp*0.06), int(Wp*0.84), int(Hp*0.15), (80,160,130), alpha=35)
+    save(img, W, H, path)
+
+
+def gen_kraken(path):
+    """6x5 — 深海巨怪: 章鱼触手"""
+    W, H = 6, 5
+    img = canvas(W, H, (3, 6, 14, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.45), 200, 55, (0,10,40,0), (10,50,120,155))
+    d = ImageDraw.Draw(img)
+    body = (20, 50, 95, 252)
+    dark = (12, 30, 60, 248)
+    sucker = (35, 85, 130, 200)
+    eye_c = (0, 210, 180, 255)
+    # mantle head
+    mantle_pts = [(cx,max(2,int(Hp*0.04))),
+                  (cx+int(Wp*0.26),int(Hp*0.18)),
+                  (cx+int(Wp*0.28),int(Hp*0.48)),
+                  (cx-int(Wp*0.28),int(Hp*0.48)),
+                  (cx-int(Wp*0.26),int(Hp*0.18))]
+    d.polygon(mantle_pts, fill=body)
+    d.polygon([(cx,max(2,int(Hp*0.07))),
+               (cx+int(Wp*0.20),int(Hp*0.20)),
+               (cx+int(Wp*0.22),int(Hp*0.44)),
+               (cx-int(Wp*0.22),int(Hp*0.44)),
+               (cx-int(Wp*0.20),int(Hp*0.20))], fill=(25,60,110,248))
+    # eyes
+    ey = int(Hp*0.28)
+    eye(d, cx-int(Wp*0.12), ey, 10, eye_c, (0, 80, 60, 255))
+    eye(d, cx+int(Wp*0.12), ey, 10, eye_c, (0, 80, 60, 255))
+    # mouth
+    d.arc([cx-int(Wp*0.12),int(Hp*0.38)-8,cx+int(Wp*0.12),int(Hp*0.38)+8], 0,180, fill=dark, width=3)
+    # 8 tentacles
+    base_y = int(Hp*0.50)
+    for i in range(8):
+        ang = 200 + i*20
+        rad = math.radians(ang)
+        length = int(min(Wp,Hp)*0.42)
+        ex = max(4,min(Wp-4, cx+int(math.cos(rad)*length)))
+        ey2 = max(base_y,min(Hp-4, base_y+int(abs(math.sin(rad))*length)))
+        pts = []
+        for j in range(9):
+            t=j/8
+            px2=cx+(ex-cx)*t; py2=base_y+(ey2-base_y)*t
+            perp_x=-(ey2-base_y); perp_y=ex-cx
+            ln=math.hypot(perp_x,perp_y) or 1
+            wave=math.sin(t*math.pi*2.5)*12*(1-t)*(1 if i%2==0 else -1)
+            pts.append((px2+perp_x/ln*wave, py2+perp_y/ln*wave))
+        for j in range(len(pts)-1):
+            w=max(1,int(7*(1-j/len(pts))))
+            col_a = max(60, int(200*(1-j/len(pts))))
+            d.line([pts[j],pts[j+1]], fill=(70,30,120,col_a), width=w)
+            if j%2==0:
+                mx=int((pts[j][0]+pts[j+1][0])/2); my2=int((pts[j][1]+pts[j+1][1])/2)
+                sr=max(2,w//2)
+                d.ellipse([mx-sr,my2-sr,mx+sr,my2+sr], fill=sucker)
+    # UI纹路: 旋涡纹 — 深海漩涡
+    overlay_pattern(img, "pattern_spiral.png", cx, int(Hp*0.32), int(Wp*0.24), int(Hp*0.20), (30,100,160), alpha=50)
+    overlay_pattern_rect(img, "divider_wave.png", int(Wp*0.05), int(Hp*0.55), int(Wp*0.90), 16, (80,180,220), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_golem(path):
+    """5x5 — 铁甲傀儡: 石龟乌龟形"""
+    W, H = 5, 5
+    img = canvas(W, H, (10, 10, 8, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.55), 165, 45, (20,15,0,0), (100,80,20,145))
+    d = ImageDraw.Draw(img)
+    shell = (95, 100, 90, 252)
+    dark = (55, 60, 50, 248)
+    metal = (160, 155, 140, 240)
+    lava = (255, 200, 80, 240)
+    # shell dome
+    blob(d, cx, int(Hp*0.55), int(Wp*0.40), int(Hp*0.30), shell, bumps=8, bump_size=0.14)
+    blob(d, cx, int(Hp*0.52), int(Wp*0.30), int(Hp*0.22), dark, bumps=6, bump_size=0.10)
+    # shell plates
+    for i in range(4):
+        a = math.radians(-30 + i*40)
+        px2 = cx + int(math.cos(a)*int(Wp*0.22))
+        py2 = int(Hp*0.52) + int(math.sin(a)*int(Hp*0.14))
+        blob(d, px2, py2, 14, 12, metal, bumps=5, bump_size=0.12)
+    # head
+    hcx, hcy = cx, int(Hp*0.22)
+    hrx, hry = int(Wp*0.18), int(Hp*0.14)
+    blob(d, hcx, hcy, hrx, hry, shell, bumps=6, bump_size=0.12)
+    # brow ridge
+    d.polygon([(hcx-int(hrx*0.60),hcy-int(hry*0.15)),
+               (hcx+int(hrx*0.60),hcy-int(hry*0.15)),
+               (hcx+int(hrx*0.50),hcy-int(hry*0.40)),
+               (hcx-int(hrx*0.50),hcy-int(hry*0.40))], fill=dark)
+    # eyes
+    ey = hcy + int(hry*0.05)
+    eye(d, hcx-int(hrx*0.35), ey, 7, lava, (80,60,10,255))
+    eye(d, hcx+int(hrx*0.35), ey, 7, lava, (80,60,10,255))
+    # mouth
+    my = hcy + int(hry*0.55)
+    for i in range(6):
+        t=i/5
+        d.line([(hcx-int(hrx*0.45)+int(hrx*0.90*t),my+(4 if i%2==0 else -4)),
+                (hcx-int(hrx*0.45)+int(hrx*0.90*(t+0.16)),my+(-4 if i%2==0 else 4))], fill=(30,32,28,220), width=2)
+    # legs
+    for s in [-1, 1]:
+        for oy in [0, int(Hp*0.22)]:
+            lx = cx + s*int(Wp*0.36)
+            ly = int(Hp*0.50) + oy
+            blob(d, lx, ly, int(Wp*0.08), int(Hp*0.08), shell, bumps=5, bump_size=0.16)
+    # moss
+    for _ in range(10):
+        mx=rng.randint(int(Wp*0.12),int(Wp*0.88)); my2=rng.randint(int(Hp*0.30),int(Hp*0.80))
+        blob(d, mx, my2, rng.randint(4,9), rng.randint(3,7), (40,110,45,130))
+    # UI纹路: 凯尔特结 — 铁甲符文
+    overlay_pattern(img, "pattern_celtic.png", cx, int(Hp*0.50), int(Wp*0.26), int(Hp*0.26), (160,140,80), alpha=50)
+    overlay_pattern_rect(img, "border_rune.png", int(Wp*0.10), int(Hp*0.10), int(Wp*0.80), int(Hp*0.80), (180,150,50), alpha=30)
+    save(img, W, H, path)
+
+
+def gen_wolf(path):
+    """6x5 — 血月狼王: 奔跑狼形"""
+    W, H = 6, 5
+    img = canvas(W, H, (14, 4, 4, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 200, 55, (40,5,5,0), (140,20,20,155))
+    d = ImageDraw.Draw(img)
+    fur = (95, 25, 22, 252)
+    dark = (50, 12, 10, 248)
+    eye_c = (255, 50, 50, 255)
+    # body - hunched wolf form
+    blob(d, cx+int(Wp*0.05), int(Hp*0.50), int(Wp*0.32), int(Hp*0.22), fur, bumps=8, bump_size=0.14)
+    blob(d, cx+int(Wp*0.05), int(Hp*0.48), int(Wp*0.24), int(Hp*0.16), dark, bumps=6, bump_size=0.10)
+    # mane
+    blob(d, cx-int(Wp*0.06), int(Hp*0.34), int(Wp*0.18), int(Hp*0.16), fur, bumps=9, bump_size=0.18)
+    # head
+    hcx = cx - int(Wp*0.14)
+    hcy = int(Hp*0.22)
+    hrx, hry = int(Wp*0.14), int(Hp*0.14)
+    blob(d, hcx, hcy, hrx, hry, fur, bumps=6, bump_size=0.12)
+    # snout
+    snout_x = hcx - int(hrx*0.40)
+    blob(d, snout_x, hcy+int(hry*0.20), int(hrx*0.50), int(hry*0.40), (110,30,25,250), bumps=4, bump_size=0.08)
+    # ears
+    for s in [-1, 1]:
+        d.polygon([(hcx+s*int(hrx*0.35),hcy-hry+4),
+                   (hcx+s*int(hrx*0.55),max(2,hcy-hry-18)),
+                   (hcx+s*int(hrx*0.20),hcy-hry+2)], fill=dark)
+    # eyes
+    eye(d, hcx-int(hrx*0.15), hcy-int(hry*0.10), 7, eye_c, (80,15,10,255))
+    eye(d, hcx+int(hrx*0.25), hcy-int(hry*0.10), 7, eye_c, (80,15,10,255))
+    # mouth
+    my = hcy + int(hry*0.50)
+    d.line([(snout_x-int(hrx*0.30),my),(hcx+int(hrx*0.10),my)], fill=(30,8,6,220), width=3)
+    teeth_row(d, snout_x-int(hrx*0.20), my-5, hcx, 4, 6, 5, (210,190,180,240))
+    # legs
+    for i, (lx, ly) in enumerate([(cx-int(Wp*0.18),int(Hp*0.72)),
+                                   (cx+int(Wp*0.08),int(Hp*0.74)),
+                                   (cx+int(Wp*0.22),int(Hp*0.70)),
+                                   (cx-int(Wp*0.08),int(Hp*0.78))]):
+        d.line([(lx,ly),(lx+(4 if i<2 else -4),int(Hp*0.94))], fill=dark, width=4)
+    # tail
+    d.line([(cx+int(Wp*0.30),int(Hp*0.42)),(cx+int(Wp*0.42),int(Hp*0.28)),
+            (cx+int(Wp*0.44),int(Hp*0.22))], fill=fur, width=5, joint="curve")
+    # blood drip
+    for _ in range(8):
+        bx=rng.randint(int(Wp*0.10),int(Wp*0.90)); by=rng.randint(int(Hp*0.50),int(Hp*0.92))
+        d.line([(bx,by),(bx,by+rng.randint(6,14))], fill=(200,20,20,120), width=2)
+    # UI纹路: 藤蔓花纹 — 血月野性纹
+    overlay_pattern(img, "pattern_vine.png", cx, int(Hp*0.50), int(Wp*0.28), int(Hp*0.22), (180,40,30), alpha=45)
+    save(img, W, H, path)
+
+
+def gen_titan(path):
+    """7x5 — 雷霆泰坦: 螃蟹形电光巨人"""
+    W, H = 7, 5
+    img = canvas(W, H, (4, 4, 16, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 230, 60, (0,0,50,0), (35,70,220,160))
+    d = ImageDraw.Draw(img)
+    armor = (40, 50, 130, 252)
+    dark = (20, 25, 70, 248)
+    elec = (200, 230, 255, 235)
+    bright = (130, 180, 255, 248)
+    # massive body
+    blob(d, cx, int(Hp*0.58), int(Wp*0.36), int(Hp*0.28), armor, bumps=7, bump_size=0.12)
+    blob(d, cx, int(Hp*0.54), int(Wp*0.26), int(Hp*0.20), dark, bumps=5, bump_size=0.08)
+    # energy core
+    blob(d, cx, int(Hp*0.52), 22, 22, bright, bumps=7, bump_size=0.15)
+    blob(d, cx, int(Hp*0.52), 12, 12, elec, bumps=4, bump_size=0.10)
+    # crab claws
+    for s in [-1, 1]:
+        ax = cx + s*int(Wp*0.32)
+        blob(d, ax, int(Hp*0.40), int(Wp*0.10), int(Hp*0.12), armor, bumps=5, bump_size=0.12)
+        claw_x = cx + s*int(Wp*0.44)
+        d.polygon([(ax,int(Hp*0.36)),(claw_x,int(Hp*0.26)),(claw_x,int(Hp*0.40))], fill=bright)
+        d.polygon([(ax,int(Hp*0.44)),(claw_x,int(Hp*0.48)),(claw_x,int(Hp*0.38))], fill=armor)
+    # legs
+    for s in [-1, 1]:
+        for i in range(2):
+            lx = cx + s*int(Wp*0.18) + s*i*int(Wp*0.10)
+            blob(d, lx, int(Hp*0.84), int(Wp*0.06), int(Hp*0.10), dark, bumps=4, bump_size=0.12)
+    # head
+    hcx, hcy = cx, int(Hp*0.20)
+    hrx, hry = int(Wp*0.16), int(Hp*0.16)
+    blob(d, hcx, hcy, hrx, hry, armor, bumps=6, bump_size=0.10)
+    blob(d, hcx, hcy+int(hry*0.18), int(hrx*0.78), int(hry*0.68), dark, bumps=5, bump_size=0.08)
+    # lightning horns
+    for s in [-1, 1]:
+        bx = hcx + s*int(hrx*0.50)
+        d.polygon([(bx-4,hcy-hry+3),(bx+4,hcy-hry+3),(bx+s*12,max(2,hcy-hry-26))], fill=elec)
+    # visor eyes
+    ey = hcy - int(hry*0.08)
+    d.ellipse([hcx-int(hrx*0.50),ey-5,hcx+int(hrx*0.50),ey+5], fill=bright)
+    eye(d, hcx-int(hrx*0.30), ey, 5, elec, (255,255,255,255))
+    eye(d, hcx+int(hrx*0.30), ey, 5, elec, (255,255,255,255))
+    # lightning arcs
+    for _ in range(12):
+        lx=rng.randint(int(Wp*0.12),int(Wp*0.88)); ly=rng.randint(int(Hp*0.25),int(Hp*0.80))
+        for _ in range(3):
+            d.line([(lx,ly),(lx+rng.randint(-18,18),ly+rng.randint(-12,12))], fill=elec, width=1)
+    # UI纹路: 锯齿纹 — 电弧闪电纹
+    overlay_pattern(img, "pattern_zigzag.png", cx, int(Hp*0.52), int(Wp*0.30), int(Hp*0.24), (60,180,255), alpha=45)
+    overlay_pattern_rect(img, "divider_chain.png", int(Wp*0.08), int(Hp*0.78), int(Wp*0.84), 20, (80,200,255), alpha=35)
+    save(img, W, H, path)
+
+
+def gen_mushroom(path):
+    """5x5 — 毒雾蘑菇: 巨大蘑菇怪"""
+    W, H = 5, 5
+    img = canvas(W, H, (8, 12, 4, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 165, 45, (10,30,0,0), (45,130,15,150))
+    d = ImageDraw.Draw(img)
+    cap = (75, 120, 35, 252)
+    stem = (140, 135, 100, 248)
+    spot = (190, 200, 50, 230)
+    dark = (40, 65, 18, 248)
+    # stem
+    d.polygon([(cx-int(Wp*0.12),int(Hp*0.40)),(cx+int(Wp*0.12),int(Hp*0.40)),
+               (cx+int(Wp*0.16),int(Hp*0.88)),(cx-int(Wp*0.16),int(Hp*0.88))], fill=stem)
+    blob(d, cx, int(Hp*0.88), int(Wp*0.20), int(Hp*0.08), (120,115,80,240), bumps=6, bump_size=0.12)
+    # mushroom cap - big dome
+    blob(d, cx, int(Hp*0.28), int(Wp*0.42), int(Hp*0.24), cap, bumps=8, bump_size=0.16)
+    blob(d, cx, int(Hp*0.26), int(Wp*0.34), int(Hp*0.18), dark, bumps=6, bump_size=0.12)
+    # spots on cap
+    for _ in range(8):
+        sx=cx+rng.randint(-int(Wp*0.30),int(Wp*0.30))
+        sy=int(Hp*0.20)+rng.randint(-int(Hp*0.12),int(Hp*0.12))
+        sr=rng.randint(6,14)
+        blob(d, sx, sy, sr, int(sr*0.8), spot, bumps=4, bump_size=0.15)
+    # face on stem
+    ey = int(Hp*0.50)
+    eye(d, cx-int(Wp*0.06), ey, 7, spot, (50,65,15,255))
+    eye(d, cx+int(Wp*0.06), ey, 7, spot, (50,65,15,255))
+    my = int(Hp*0.62)
+    d.arc([cx-int(Wp*0.08),my-8,cx+int(Wp*0.08),my+8], 0,180, fill=dark, width=3)
+    # spore particles
+    for _ in range(18):
+        fx=rng.randint(6,Wp-6); fy=rng.randint(6,Hp-6)
+        blob(d, fx, fy, rng.randint(2,6), rng.randint(2,4), (160,180,40,90))
+    # UI纹路: 旋涡纹 — 蘑菇孢子旋涡
+    overlay_pattern(img, "pattern_spiral.png", cx, int(Hp*0.30), int(Wp*0.24), int(Hp*0.18), (140,160,40), alpha=45)
+    overlay_pattern(img, "pattern_vine.png", cx, int(Hp*0.65), int(Wp*0.18), int(Hp*0.16), (80,120,30), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_crystal(path):
+    """5x5 — 水晶守卫: 海星形水晶体"""
+    W, H = 5, 5
+    img = canvas(W, H, (4, 14, 16, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 165, 45, (0,20,25,0), (10,100,110,155))
+    d = ImageDraw.Draw(img)
+    crystal = (50, 130, 140, 252)
+    bright = (160, 230, 245, 235)
+    dark = (25, 70, 80, 248)
+    core = (0, 255, 220, 240)
+    # crystal spikes radiating from center (star/starfish)
+    for i in range(5):
+        ang = math.radians(-90 + i*72)
+        tip_x = cx + int(math.cos(ang)*int(Wp*0.44))
+        tip_y = int(Hp*0.48) + int(math.sin(ang)*int(Hp*0.42))
+        tip_x = max(4,min(Wp-4,tip_x))
+        tip_y = max(4,min(Hp-4,tip_y))
+        base_w = int(Wp*0.08)
+        perp = ang + math.pi/2
+        bx1 = cx+int(math.cos(perp)*base_w)
+        by1 = int(Hp*0.48)+int(math.sin(perp)*base_w)
+        bx2 = cx-int(math.cos(perp)*base_w)
+        by2 = int(Hp*0.48)-int(math.sin(perp)*base_w)
+        d.polygon([(bx1,by1),(tip_x,tip_y),(bx2,by2)], fill=crystal)
+        d.line([(cx,int(Hp*0.48)),(tip_x,tip_y)], fill=bright, width=2)
+    # core body
+    blob(d, cx, int(Hp*0.48), int(Wp*0.18), int(Hp*0.18), dark, bumps=6, bump_size=0.10)
+    blob(d, cx, int(Hp*0.48), int(Wp*0.12), int(Hp*0.12), crystal, bumps=5, bump_size=0.08)
+    # central eye
+    eye(d, cx, int(Hp*0.46), 12, core, (0,120,100,255))
+    # smaller eyes on tips
+    for i in range(5):
+        ang = math.radians(-90 + i*72)
+        tx = cx + int(math.cos(ang)*int(Wp*0.32))
+        ty = int(Hp*0.48) + int(math.sin(ang)*int(Hp*0.30))
+        tx = max(8,min(Wp-8,tx)); ty = max(8,min(Hp-8,ty))
+        eye(d, tx, ty, 4, core, (0,80,70,255))
+    # crystal shards floating
+    for _ in range(8):
+        sx=rng.randint(8,Wp-8); sy=rng.randint(8,Hp-8)
+        sh=rng.randint(8,16)
+        d.polygon([(sx-3,sy),(sx,sy-sh),(sx+3,sy)], fill=bright)
+    # UI纹路: 菱形编织 — 水晶棱面纹
+    overlay_pattern(img, "pattern_diamond.png", cx, int(Hp*0.50), int(Wp*0.22), int(Hp*0.22), (80,220,210), alpha=50)
+    save(img, W, H, path)
+
+
+def gen_assassin(path):
+    """5x5 — 暗影刺客: 蝎子形"""
+    W, H = 5, 5
+    img = canvas(W, H, (8, 6, 10, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.55), 165, 45, (15,0,20,0), (80,20,100,150))
+    d = ImageDraw.Draw(img)
+    body = (45, 42, 52, 252)
+    dark = (22, 20, 28, 248)
+    purple = (200, 50, 255, 240)
+    # scorpion body
+    blob(d, cx, int(Hp*0.58), int(Wp*0.28), int(Hp*0.18), body, bumps=7, bump_size=0.12)
+    blob(d, cx, int(Hp*0.56), int(Wp*0.20), int(Hp*0.12), dark, bumps=5, bump_size=0.08)
+    # tail curling up and over
+    tail_pts = [(cx,int(Hp*0.44)),(cx+int(Wp*0.05),int(Hp*0.32)),
+                (cx+int(Wp*0.02),int(Hp*0.18)),(cx-int(Wp*0.06),int(Hp*0.10)),
+                (cx-int(Wp*0.10),int(Hp*0.06))]
+    for i in range(len(tail_pts)-1):
+        w = max(2, 8-i*2)
+        d.line([tail_pts[i],tail_pts[i+1]], fill=body, width=w)
+    # stinger
+    sx, sy = tail_pts[-1]
+    d.polygon([(sx-4,sy+2),(sx+4,sy+2),(sx,max(2,sy-12))], fill=purple)
+    # claws
+    for s in [-1, 1]:
+        ax = cx + s*int(Wp*0.30)
+        ay = int(Hp*0.45)
+        d.line([(cx+s*int(Wp*0.18),int(Hp*0.52)),(ax,ay)], fill=body, width=5)
+        d.polygon([(ax,ay-6),(ax+s*14,ay-10),(ax+s*8,ay)], fill=dark)
+        d.polygon([(ax,ay+6),(ax+s*14,ay+10),(ax+s*8,ay)], fill=dark)
+    # legs
+    for s in [-1, 1]:
+        for i in range(3):
+            lx = cx + s*int(Wp*0.16) + s*i*int(Wp*0.06)
+            ly = int(Hp*0.62) + i*int(Hp*0.06)
+            d.line([(lx,ly),(lx+s*int(Wp*0.12),ly+int(Hp*0.14))], fill=dark, width=3)
+    # head
+    hcx, hcy = cx, int(Hp*0.52)
+    blob(d, hcx, hcy, int(Wp*0.12), int(Hp*0.08), body, bumps=5, bump_size=0.10)
+    eye(d, hcx-8, hcy-2, 5, purple, (120,20,160,255))
+    eye(d, hcx+8, hcy-2, 5, purple, (120,20,160,255))
+    # shadow wisps
+    for _ in range(10):
+        wx=rng.randint(8,Wp-8); wy=rng.randint(8,Hp-8)
+        blob(d, wx, wy, rng.randint(4,10), rng.randint(3,7), (80,40,120,70))
+    # UI纹路: 编织纹 — 暗影蝎甲
+    overlay_pattern(img, "pattern_weave.png", cx, int(Hp*0.68), int(Wp*0.22), int(Hp*0.20), (60,30,90), alpha=45)
+    overlay_pattern(img, "pattern_greek_key.png", cx, int(Hp*0.52), int(Wp*0.10), int(Hp*0.06), (120,60,180), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_phoenix(path):
+    """7x5 — 火焰凤凰: 金红展翅"""
+    W, H = 7, 5
+    img = canvas(W, H, (16, 6, 2, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 220, 55, (60,12,0,0), (200,80,8,165))
+    d = ImageDraw.Draw(img)
+    body = (210, 80, 10, 250)
+    wing = (190, 55, 5, 218)
+    feather = (240, 160, 20, 225)
+    tail = (255, 200, 30, 215)
+    # wings
+    for s in [-1, 1]:
+        pts = [(cx+s*int(Wp*0.14),int(Hp*0.42)),
+               (cx+s*int(Wp*0.48),int(Hp*0.06)),
+               (cx+s*int(Wp*0.48),int(Hp*0.55)),
+               (cx+s*int(Wp*0.22),int(Hp*0.58))]
+        d.polygon(pts, fill=wing)
+        for k in range(4):
+            t=(k+1)/5
+            fx=int(pts[1][0]+(pts[2][0]-pts[1][0])*t)
+            fy=int(pts[1][1]+(pts[2][1]-pts[1][1])*t)
+            tip_x=max(2,min(Wp-2,fx+s*16)); tip_y=max(2,min(Hp-2,fy-12))
+            d.polygon([(fx-5,fy),(fx+5,fy),(tip_x,tip_y)], fill=feather)
+    # body
+    blob(d, cx, int(Hp*0.54), int(Wp*0.16), int(Hp*0.22), body, bumps=6, bump_size=0.10)
+    # tail
+    for i in range(5):
+        tx = cx + (i-2)*int(Wp*0.06)
+        d.polygon([(tx-6,int(Hp*0.73)),(tx+6,int(Hp*0.73)),(tx,min(Hp-2,int(Hp*0.95)))], fill=tail)
+    # head
+    hcx, hcy = cx, int(Hp*0.24)
+    hrx, hry = int(Wp*0.10), int(Hp*0.12)
+    blob(d, hcx, hcy, hrx, hry, body, bumps=5, bump_size=0.10)
+    # flame crest
+    for ox, ch in [(-int(hrx*0.50),18),(0,26),(int(hrx*0.50),18)]:
+        d.polygon([(hcx+ox-4,hcy-hry+4),(hcx+ox+4,hcy-hry+4),(hcx+ox,max(2,hcy-hry-ch))], fill=feather)
+    # eyes
+    eye(d, hcx-int(hrx*0.40), hcy, 5, (255,230,50,255), (80,30,0,255))
+    eye(d, hcx+int(hrx*0.40), hcy, 5, (255,230,50,255), (80,30,0,255))
+    # beak
+    by = hcy + int(hry*0.35)
+    d.polygon([(hcx-int(hrx*0.28),by),(hcx+int(hrx*0.28),by),(hcx,by+int(hry*0.50))], fill=(230,170,20,250))
+    # flame particles
+    for _ in range(16):
+        fx=rng.randint(8,Wp-8); fy=rng.randint(8,Hp-8)
+        blob(d, fx, fy, rng.randint(3,8), rng.randint(2,6), (255,140,30,80))
+    # UI纹路: 龙鳞纹 — 凤凰羽鳞
+    overlay_pattern(img, "pattern_scale.png", cx, int(Hp*0.50), int(Wp*0.26), int(Hp*0.22), (255,160,30), alpha=45)
+    overlay_pattern_rect(img, "divider_ornate.png", int(Wp*0.10), int(Hp*0.42), int(Wp*0.80), 24, (255,200,60), alpha=35)
+    save(img, W, H, path)
+
+
+def gen_lich(path):
+    """6x5 — 死灵巫王: 骷髅法师"""
+    W, H = 6, 5
+    img = canvas(W, H, (6, 10, 6, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 200, 55, (10,25,0,0), (40,120,30,155))
+    d = ImageDraw.Draw(img)
+    robe = (35, 55, 30, 250)
+    dark = (18, 30, 15, 248)
+    soul = (100, 255, 80, 240)
+    bone = (195, 188, 170, 245)
+    # robe
+    robe_pts = [(cx-int(Wp*0.44),int(Hp*0.94)),(cx+int(Wp*0.44),int(Hp*0.94)),
+                (cx+int(Wp*0.30),int(Hp*0.58)),(cx+int(Wp*0.20),int(Hp*0.26)),
+                (cx-int(Wp*0.20),int(Hp*0.26)),(cx-int(Wp*0.30),int(Hp*0.58))]
+    d.polygon(robe_pts, fill=dark)
+    blob(d, cx, int(Hp*0.58), int(Wp*0.24), int(Hp*0.24), robe, bumps=6, bump_size=0.08)
+    # skull head
+    hcx, hcy = cx, int(Hp*0.16)
+    hrx, hry = int(Wp*0.16), int(Hp*0.14)
+    blob(d, hcx, hcy, hrx, hry, bone, bumps=6, bump_size=0.08)
+    blob(d, hcx, hcy+int(hry*0.30), int(hrx*0.72), int(hry*0.48), (170,162,148,240), bumps=4, bump_size=0.06)
+    # crown
+    for ox, sh in [(-int(hrx*0.50),14),(-int(hrx*0.20),20),(0,26),(int(hrx*0.20),20),(int(hrx*0.50),14)]:
+        d.polygon([(hcx+ox-4,hcy-hry+4),(hcx+ox+4,hcy-hry+4),(hcx+ox,max(2,hcy-hry-sh))], fill=soul)
+    # eye sockets
+    ey = hcy - int(hry*0.05)
+    for s in [-1, 1]:
+        ex = hcx + s*int(hrx*0.36)
+        d.ellipse([ex-7,ey-5,ex+7,ey+5], fill=(15,20,12,240))
+        eye(d, ex, ey, 5, soul, (160,255,120,255))
+    # jaw
+    jy = hcy + int(hry*0.55)
+    d.line([(hcx-int(hrx*0.40),jy),(hcx+int(hrx*0.40),jy)], fill=(12,18,10,220), width=3)
+    # soul orb chest
+    orb_cy = int(Hp*0.48)
+    blob(d, cx, orb_cy, 18, 18, (60,180,50,200), bumps=8, bump_size=0.15)
+    blob(d, cx, orb_cy, 10, 10, soul, bumps=4, bump_size=0.10)
+    # bony hands
+    for s in [-1, 1]:
+        hx = cx + s*int(Wp*0.26)
+        hy = int(Hp*0.52)
+        blob(d, hx, hy, 10, 8, bone, bumps=5, bump_size=0.20)
+    # soul wisps
+    for _ in range(10):
+        wx=rng.randint(8,Wp-8); wy=rng.randint(8,Hp-8)
+        blob(d, wx, wy, rng.randint(3,8), rng.randint(2,6), (80,200,60,70))
+    # UI纹路: 符文边框 + 希腊回纹 — 死灵法阵
+    overlay_pattern(img, "pattern_greek_key.png", cx, int(Hp*0.48), int(Wp*0.24), int(Hp*0.10), (80,200,60), alpha=50)
+    overlay_pattern_rect(img, "border_rune.png", int(Wp*0.10), int(Hp*0.10), int(Wp*0.80), int(Hp*0.80), (100,220,80), alpha=30)
+    save(img, W, H, path)
+
+
+def gen_void(path):
+    """5x5 — 虚空行者: 水母形"""
+    W, H = 5, 5
+    img = canvas(W, H, (6, 3, 12, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.45), 170, 45, (10,0,30,0), (60,18,130,160))
+    d = ImageDraw.Draw(img)
+    body = (55, 20, 100, 252)
+    dark = (30, 10, 60, 248)
+    glow_c = (180, 80, 255, 250)
+    # bell dome (jellyfish cap)
+    blob(d, cx, int(Hp*0.28), int(Wp*0.38), int(Hp*0.24), body, bumps=8, bump_size=0.14)
+    blob(d, cx, int(Hp*0.26), int(Wp*0.28), int(Hp*0.18), dark, bumps=6, bump_size=0.10)
+    # face on bell
+    eye(d, cx-int(Wp*0.10), int(Hp*0.24), 8, glow_c, (100,40,180,255))
+    eye(d, cx+int(Wp*0.10), int(Hp*0.24), 8, glow_c, (100,40,180,255))
+    # inner mouth glow
+    blob(d, cx, int(Hp*0.34), int(Wp*0.08), int(Hp*0.04), (80,30,140,200))
+    # trailing tentacles
+    for i in range(7):
+        start_x = cx - int(Wp*0.28) + i*int(Wp*0.095)
+        pts = []
+        for j in range(10):
+            t = j/9
+            px2 = start_x + math.sin(t*math.pi*3 + i*0.5) * 12
+            py2 = int(Hp*0.46) + t*int(Hp*0.48)
+            py2 = min(Hp-2, py2)
+            pts.append((px2, py2))
+        for j in range(len(pts)-1):
+            w = max(1, int(4*(1-j/len(pts))))
+            col_a = max(60, int(200*(1-j/len(pts))))
+            d.line([pts[j],pts[j+1]], fill=(70,30,120,col_a), width=w)
+    # bioluminescent dots
+    for _ in range(14):
+        fx=rng.randint(8,Wp-8); fy=rng.randint(int(Hp*0.15),Hp-8)
+        r2=rng.randint(2,5)
+        d.ellipse([fx-r2,fy-r2,fx+r2,fy+r2], fill=(160,80,240,120))
+    # UI纹路: 旋涡纹 — 虚空次元裂痕
+    overlay_pattern(img, "pattern_spiral.png", cx, int(Hp*0.28), int(Wp*0.22), int(Hp*0.18), (120,60,200), alpha=50)
+    overlay_pattern_rect(img, "divider_wave.png", int(Wp*0.06), int(Hp*0.50), int(Wp*0.88), 16, (160,80,240), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_eagle(path):
+    """8x4 — 风暴巨鹰: 展翅猛禽"""
+    W, H = 8, 4
+    img = canvas(W, H, (6, 8, 16, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 240, 55, (10,12,25,0), (80,90,160,150))
+    d = ImageDraw.Draw(img)
+    body = (100, 105, 118, 252)
+    dark = (55, 58, 68, 248)
+    white = (210, 220, 235, 245)
+    storm = (200, 220, 255, 235)
+    # massive wings
+    for s in [-1, 1]:
+        pts = [(cx+s*int(Wp*0.10),int(Hp*0.42)),
+               (cx+s*int(Wp*0.49),int(Hp*0.04)),
+               (cx+s*int(Wp*0.49),int(Hp*0.55)),
+               (cx+s*int(Wp*0.18),int(Hp*0.60))]
+        d.polygon(pts, fill=dark)
+        for k in range(5):
+            t=(k+1)/6
+            fx=int(pts[1][0]+(pts[2][0]-pts[1][0])*t)
+            fy=int(pts[1][1]+(pts[2][1]-pts[1][1])*t)
+            tip_x=max(2,min(Wp-2,fx+s*14)); tip_y=max(2,fy-10)
+            d.polygon([(fx-4,fy),(fx+4,fy),(tip_x,tip_y)], fill=body)
+    # body
+    blob(d, cx, int(Hp*0.52), int(Wp*0.14), int(Hp*0.25), body, bumps=6, bump_size=0.10)
+    blob(d, cx, int(Hp*0.48), int(Wp*0.10), int(Hp*0.18), dark, bumps=5, bump_size=0.08)
+    # white chest
+    blob(d, cx, int(Hp*0.55), int(Wp*0.08), int(Hp*0.12), white, bumps=4, bump_size=0.08)
+    # head
+    hcx, hcy = cx, int(Hp*0.22)
+    hrx, hry = int(Wp*0.08), int(Hp*0.16)
+    blob(d, hcx, hcy, hrx, hry, white, bumps=5, bump_size=0.10)
+    # fierce brow
+    d.polygon([(hcx-int(hrx*0.80),hcy-int(hry*0.25)),
+               (hcx+int(hrx*0.80),hcy-int(hry*0.25)),
+               (hcx+int(hrx*0.55),hcy-int(hry*0.50)),
+               (hcx-int(hrx*0.55),hcy-int(hry*0.50))], fill=dark)
+    # eyes
+    ey = hcy - int(hry*0.05)
+    eye(d, hcx-int(hrx*0.40), ey, 5, storm, (30,35,60,255))
+    eye(d, hcx+int(hrx*0.40), ey, 5, storm, (30,35,60,255))
+    # hooked beak
+    by = hcy + int(hry*0.25)
+    d.polygon([(hcx-int(hrx*0.30),by),(hcx+int(hrx*0.30),by),
+               (hcx,by+int(hry*0.55))], fill=(180,160,60,250))
+    # tail
+    for i in range(4):
+        tx = cx + (i-1.5)*int(Wp*0.03)
+        d.polygon([(int(tx)-4,int(Hp*0.72)),(int(tx)+4,int(Hp*0.72)),(int(tx),min(Hp-2,int(Hp*0.94)))], fill=dark)
+    # storm lightning
+    for _ in range(8):
+        lx=rng.randint(int(Wp*0.08),int(Wp*0.92)); ly=rng.randint(int(Hp*0.15),int(Hp*0.85))
+        for _ in range(2):
+            d.line([(lx,ly),(lx+rng.randint(-16,16),ly+rng.randint(-10,10))], fill=storm, width=1)
+    # UI纹路: 藤蔓花纹 — 风暴羽翼纹
+    overlay_pattern(img, "pattern_vine.png", cx, int(Hp*0.42), int(Wp*0.30), int(Hp*0.18), (100,140,180), alpha=40)
+    overlay_pattern_rect(img, "pattern_zigzag.png", int(Wp*0.06), int(Hp*0.65), int(Wp*0.88), 32, (140,180,220), alpha=35)
+    save(img, W, H, path)
+
+
+def gen_chaos(path):
+    """7x5 — 混沌领主: 三头蛇形"""
+    W, H = 7, 5
+    img = canvas(W, H, (14, 4, 6, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.6), 220, 55, (40,5,5,0), (160,20,30,160))
+    d = ImageDraw.Draw(img)
+    body = (80, 18, 22, 252)
+    dark = (40, 8, 10, 248)
+    fire = (255, 40, 60, 240)
+    scale = (100, 25, 30, 130)
+    # coiled body mass
+    blob(d, cx, int(Hp*0.70), int(Wp*0.38), int(Hp*0.22), body, bumps=9, bump_size=0.16)
+    blob(d, cx, int(Hp*0.66), int(Wp*0.28), int(Hp*0.16), dark, bumps=7, bump_size=0.12)
+    # three necks + heads
+    heads = [(int(Wp*0.20),int(Hp*0.12), int(Wp*0.25),int(Hp*0.45)),
+             (int(Wp*0.50),int(Hp*0.08), int(Wp*0.50),int(Hp*0.42)),
+             (int(Wp*0.80),int(Hp*0.12), int(Wp*0.75),int(Hp*0.45))]
+    head_r = int(Wp*0.08)
+    for (hx, hy, nx, ny) in heads:
+        d.polygon([(nx-12,ny),(nx+12,ny),(hx+8,hy+head_r),(hx-8,hy+head_r)], fill=dark)
+        blob(d, hx, hy, head_r, int(Hp*0.10), body, bumps=5, bump_size=0.10)
+        blob(d, hx, hy+int(Hp*0.05), int(head_r*0.75), int(Hp*0.06), (95,22,26,250), bumps=4, bump_size=0.06)
+        eye(d, hx-int(head_r*0.40), hy-int(Hp*0.02), 5, fire, (80,12,15,255))
+        eye(d, hx+int(head_r*0.40), hy-int(Hp*0.02), 5, fire, (80,12,15,255))
+        my = hy + int(Hp*0.08)
+        d.line([(hx-int(head_r*0.55),my),(hx+int(head_r*0.55),my)], fill=(25,5,6,220), width=2)
+        teeth_row(d, hx-int(head_r*0.45), my-4, hx+int(head_r*0.45), 3, 5, 4, (210,180,170,240))
+    # legs/tail
+    for s in [-1, 1]:
+        lx = cx + s*int(Wp*0.30)
+        blob(d, lx, int(Hp*0.88), int(Wp*0.06), int(Hp*0.08), dark, bumps=4, bump_size=0.14)
+    # scales
+    for _ in range(35):
+        sx=rng.randint(int(Wp*0.10),int(Wp*0.90)); sy=rng.randint(int(Hp*0.40),int(Hp*0.88))
+        d.arc([sx-5,sy-3,sx+5,sy+3],180,360,fill=scale,width=2)
+    # chaos fire
+    for _ in range(12):
+        fx=rng.randint(8,Wp-8); fy=rng.randint(8,Hp-8)
+        blob(d, fx, fy, rng.randint(3,8), rng.randint(2,6), (255,60,40,70))
+    # UI纹路: 龙鳞纹 + 凯尔特结 — 混沌纹
+    overlay_pattern(img, "pattern_scale.png", cx, int(Hp*0.70), int(Wp*0.36), int(Hp*0.20), (100,25,30), alpha=45)
+    overlay_pattern(img, "pattern_celtic.png", int(Wp*0.50), int(Hp*0.30), int(Wp*0.12), int(Hp*0.10), (255,40,60), alpha=40)
+    save(img, W, H, path)
+
+
+def gen_enddragon(path):
+    """8x5 — 终焉之龙: 古龙完全体"""
+    W, H = 8, 5
+    img = canvas(W, H, (14, 10, 4, 255))
+    d = ImageDraw.Draw(img)
+    cx, cy = cxy(img)
+    Wp, Hp = W*CELL, H*CELL
+    glow(img, cx, int(Hp*0.5), 260, 65, (50,35,0,0), (180,140,20,165))
+    d = ImageDraw.Draw(img)
+    body = (120, 90, 25, 252)
+    dark = (65, 48, 12, 248)
+    gold = (255, 220, 100, 240)
+    fire = (255, 160, 30, 220)
+    # massive wings
+    for s in [-1, 1]:
+        pts = [(cx+s*int(Wp*0.16),int(Hp*0.38)),
+               (cx+s*int(Wp*0.49),int(Hp*0.04)),
+               (cx+s*int(Wp*0.49),int(Hp*0.60)),
+               (cx+s*int(Wp*0.22),int(Hp*0.58))]
+        d.polygon(pts, fill=(90,65,15,218))
+        for k in range(5):
+            t=(k+1)/6
+            fx=int(pts[1][0]+(pts[2][0]-pts[1][0])*t)
+            fy=int(pts[1][1]+(pts[2][1]-pts[1][1])*t)
+            d.line([pts[0],(fx,fy)], fill=(110,80,20,160), width=2)
+    # body
+    blob(d, cx, int(Hp*0.58), int(Wp*0.24), int(Hp*0.26), body, bumps=7, bump_size=0.12)
+    blob(d, cx, int(Hp*0.56), int(Wp*0.18), int(Hp*0.18), dark, bumps=5, bump_size=0.08)
+    # belly
+    blob(d, cx, int(Hp*0.62), int(Wp*0.14), int(Hp*0.14), (140,105,30,220), bumps=4, bump_size=0.06)
+    # neck
+    d.polygon([(cx-int(Wp*0.05),int(Hp*0.38)),(cx+int(Wp*0.05),int(Hp*0.38)),
+               (cx+int(Wp*0.04),int(Hp*0.18)),(cx-int(Wp*0.04),int(Hp*0.18))], fill=body)
+    # head
+    hcx, hcy = cx, int(Hp*0.12)
+    hrx, hry = int(Wp*0.10), int(Hp*0.12)
+    blob(d, hcx, hcy, hrx, hry, body, bumps=6, bump_size=0.10)
+    blob(d, hcx, hcy+int(hry*0.15), int(hrx*0.75), int(hry*0.45), (140,105,30,250), bumps=4, bump_size=0.06)
+    # crown horns
+    for s in [-1, 1]:
+        bx = hcx + s*int(hrx*0.58)
+        tip_x = bx + s*18
+        d.polygon([(bx-5,hcy-hry+4),(bx+5,hcy-hry+4),(tip_x,max(2,hcy-hry-30))], fill=gold)
+    d.polygon([(hcx-4,hcy-hry+2),(hcx+4,hcy-hry+2),(hcx,max(2,hcy-hry-20))], fill=gold)
+    # eyes
+    ey = hcy - int(hry*0.10)
+    eye(d, hcx-int(hrx*0.40), ey, 7, gold, (50,35,5,255))
+    eye(d, hcx+int(hrx*0.40), ey, 7, gold, (50,35,5,255))
+    # mouth + teeth
+    my = hcy + int(hry*0.55)
+    d.line([(hcx-int(hrx*0.55),my),(hcx+int(hrx*0.55),my)], fill=(35,22,5,220), width=3)
+    teeth_row(d, hcx-int(hrx*0.45), my-6, hcx+int(hrx*0.45), 5, 7, 6, (230,215,180,240))
+    # fire breath
+    fire_y0 = my + 4
+    fire_y1 = int(Hp*0.35)
+    if fire_y0 < fire_y1:
+        d.polygon([(hcx-12,fire_y0),(hcx+12,fire_y0),(hcx+20,fire_y1),(hcx,fire_y1-6),(hcx-20,fire_y1)],
+                  fill=(255,130,15,195))
+        d.polygon([(hcx-6,fire_y0),(hcx+6,fire_y0),(hcx+10,fire_y1-2),(hcx,fire_y1-8),(hcx-10,fire_y1-2)],
+                  fill=(255,210,60,195))
+    # legs
+    for s in [-1, 1]:
+        lx = cx + s*int(Wp*0.16)
+        d.line([(lx,int(Hp*0.76)),(lx+s*int(Wp*0.04),int(Hp*0.94))], fill=dark, width=5)
+        blob(d, lx+s*int(Wp*0.04), int(Hp*0.94), 10, 6, body, bumps=4, bump_size=0.18)
+    # tail
+    d.line([(cx,int(Hp*0.78)),(cx-int(Wp*0.08),int(Hp*0.88)),
+            (cx-int(Wp*0.14),int(Hp*0.94))], fill=dark, width=5, joint="curve")
+    # scales
+    for _ in range(50):
+        sx=rng.randint(int(Wp*0.10),int(Wp*0.90)); sy=rng.randint(int(Hp*0.20),int(Hp*0.85))
+        d.arc([sx-5,sy-3,sx+5,sy+3],180,360,fill=(160,120,30,100),width=2)
+    # UI纹路: 龙鳞纹 + 符文边框 + 华丽分割线 — 终焉古龙全套装饰
+    overlay_pattern(img, "pattern_scale.png", cx, int(Hp*0.58), int(Wp*0.22), int(Hp*0.24), (180,140,30), alpha=50)
+    overlay_pattern_rect(img, "border_rune.png", int(Wp*0.06), int(Hp*0.06), int(Wp*0.88), int(Hp*0.88), (255,220,100), alpha=30)
+    overlay_pattern_rect(img, "divider_ornate.png", int(Wp*0.12), int(Hp*0.38), int(Wp*0.76), 24, (255,200,60), alpha=35)
+    save(img, W, H, path)
+
+
+# ── 生成主函数 ───────────────────────────────────
+
+BOSSES = {
+    "gargoyle": (gen_gargoyle, 5, 4),
+    "spider":   (gen_spider,   5, 4),
+    "serpent":  (gen_serpent,   6, 4),
+    "giant":    (gen_giant,     7, 5),
+    "demon":    (gen_demon,     6, 5),
+    "witch":    (gen_witch,     5, 5),
+    "wyvern":   (gen_wyvern,    7, 4),
+    "kraken":   (gen_kraken,    6, 5),
+    "golem":    (gen_golem,     5, 5),
+    "wolf":     (gen_wolf,      6, 5),
+    "titan":    (gen_titan,     7, 5),
+    "mushroom": (gen_mushroom,  5, 5),
+    "crystal":  (gen_crystal,   5, 5),
+    "assassin": (gen_assassin,  5, 5),
+    "phoenix":  (gen_phoenix,   7, 5),
+    "lich":     (gen_lich,      6, 5),
+    "void":     (gen_void,      5, 5),
+    "eagle":    (gen_eagle,     8, 4),
+    "chaos":    (gen_chaos,     7, 5),
+    "enddragon":(gen_enddragon, 8, 5),
 }
 
-def px(v):
-    if isinstance(v, (list, tuple)) and len(v) > 0 and not isinstance(v[0], (int, float)):
-        return [(int(x * SCALE), int(y * SCALE)) for x, y in v]
-    if isinstance(v, (list, tuple)):
-        return [int(x * SCALE) for x in v]
-    return int(v * SCALE)
-
-def circle(dr, cx, cy, r, fill, outline=None, ow=1):
-    dr.ellipse([px(cx - r), px(cy - r), px(cx + r), px(cy + r)], fill=fill,
-               outline=outline, width=px(ow) if outline else 0)
-
-def rect(dr, x0, y0, x1, y1, fill=None, outline=None, ow=1, radius=0):
-    dr.rounded_rectangle([px(x0), px(y0), px(x1), px(y1)],
-                         radius=px(radius), fill=fill,
-                         outline=outline, width=px(ow) if outline else 0)
-
-def poly(dr, pts, fill, outline=None, ow=1):
-    dr.polygon(px(pts), fill=fill, outline=outline, width=px(ow) if outline else 0)
-
-def line(dr, x0, y0, x1, y1, fill, w=1):
-    dr.line([px(x0), px(y0), px(x1), px(y1)], fill=fill, width=px(w))
-
-def add_glow(img, cx, cy, r, color, steps=12):
-    glow = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    gdr = ImageDraw.Draw(glow)
-    for i in range(steps, 0, -1):
-        alpha = int(color[3] * (i / steps) ** 2)
-        rad = int(r * i / steps)
-        c = color[:3] + (alpha,)
-        gdr.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=c)
-    return Image.alpha_composite(img, glow)
-
-def stone_noise(dr, x0, y0, x1, y1, base_color, density=0.3):
-    for y in range(y0, y1, px(2)):
-        for x in range(x0, x1, px(2)):
-            if random.random() < density:
-                shade = random.randint(-15, 15)
-                c = tuple(max(0, min(255, base_color[i] + shade)) for i in range(3))
-                dr.rectangle([x, y, x + px(2), y + px(2)], fill=c + (60,))
-
-def _row_spans(shape_list):
-    rows = {}
-    for x, y in shape_list:
-        rows.setdefault(y, []).append(x)
-    spans = []
-    for y, xs in rows.items():
-        xs = sorted(xs)
-        start = xs[0]
-        prev = xs[0]
-        for x in xs[1:]:
-            if x == prev + 1:
-                prev = x
-                continue
-            spans.append({"y": y, "start": start, "end": prev, "width": prev - start + 1})
-            start = x
-            prev = x
-        spans.append({"y": y, "start": start, "end": prev, "width": prev - start + 1})
-    return spans
-
-def _choose_face_span(shape_list, min_y):
-    """Pick best row for face — prefer upper body, wide spans."""
-    max_y = max(p[1] for p in shape_list)
-    height = max_y - min_y + 1
-    spans = _row_spans(shape_list)
-    for min_w in [3, 2]:
-        for ratio in [0.35, 0.55, 0.75, 1.0]:
-            cutoff = min_y + max(1, int(height * ratio))
-            cands = [s for s in spans if s["y"] <= cutoff and s["width"] >= min_w]
-            if cands:
-                cands.sort(key=lambda s: (s["y"], -s["width"]))
-                return cands[0]
-    spans.sort(key=lambda s: (-s["width"], s["y"]))
-    return spans[0]
-
-def _choose_mouth_span(shape_list, face_span):
-    spans = _row_spans(shape_list)
-    candidates = []
-    for span in spans:
-        if span["y"] < face_span["y"]:
-            continue
-        overlap_start = max(span["start"], face_span["start"])
-        overlap_end = min(span["end"], face_span["end"])
-        overlap = overlap_end - overlap_start + 1
-        if overlap > 0:
-            candidates.append({
-                "y": span["y"],
-                "start": overlap_start,
-                "end": overlap_end,
-                "width": overlap,
-            })
-    if not candidates:
-        return {"y": face_span["y"], "start": face_span["start"], "end": face_span["end"], "width": face_span["width"]}
-    candidates.sort(key=lambda s: (0 if s["y"] == face_span["y"] + 1 else 1, -s["width"], s["y"]))
-    return candidates[0]
-
-def gen_boss_sheet(name, cfg):
-    """生成单个Boss的atlas贴图"""
-    cols, rows = cfg["cols"], cfg["rows"]
-    shape = set(cfg["shape"])
-    W = cols * CELL_PX * SCALE
-    H = rows * CELL_PX * SCALE
-    final_w = cols * CELL_PX
-    final_h = rows * CELL_PX
-
-    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    dr = ImageDraw.Draw(img)
-
-    body = cfg["body"]
-    dark = cfg["dark"]
-    crack_c = cfg["crack"]
-    glow_c = cfg["glow"]
-    eye_c = cfg["eye"]
-    rune_c = cfg["rune"]
-    accent = cfg["accent"]
-
-    cell = CELL_PX  # 64
-
-    # ── 填充每个形状格子 ──
-    for (cx, cy) in shape:
-        x0 = cx * cell
-        y0 = cy * cell
-        x1 = x0 + cell
-        y1 = y0 + cell
-        # 深色底
-        rect(dr, x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill=dark + (255,), radius=4)
-        # 主体填色
-        rect(dr, x0 + 3, y0 + 3, x1 - 3, y1 - 3, fill=body + (255,), radius=3)
-        # 石头噪点
-        stone_noise(dr, px(x0 + 3), px(y0 + 3), px(x1 - 3), px(y1 - 3), body, 0.25)
-
-    shape_list = list(shape)
-    avg_x = sum(p[0] for p in shape_list) / len(shape_list)
-    avg_y = sum(p[1] for p in shape_list) / len(shape_list)
-
-    # ── 中心符文（画在身体中部，避开脸部） ──
-    min_y = min(p[1] for p in shape_list)
-    # 中心符文选在avg_y之下的格子
-    body_cells = [p for p in shape_list if p[1] > min_y + 1]
-    if not body_cells:
-        body_cells = [p for p in shape_list if p[1] > min_y]
-    if not body_cells:
-        body_cells = shape_list
-    center_cell = min(body_cells, key=lambda p: (p[0]+0.5-avg_x)**2 + (p[1]+0.5-avg_y)**2)
-    rcx = (center_cell[0] + 0.5) * cell
-    rcy = (center_cell[1] + 0.5) * cell
-    rr = 18
-    for i in range(6):
-        a1 = math.radians(60 * i - 90)
-        a2 = math.radians(60 * (i + 1) - 90)
-        x1r = rcx + rr * math.cos(a1)
-        y1r = rcy + rr * math.sin(a1)
-        x2r = rcx + rr * math.cos(a2)
-        y2r = rcy + rr * math.sin(a2)
-        line(dr, x1r, y1r, x2r, y2r, rune_c + (255,), 2)
-    img = add_glow(img, px(rcx), px(rcy), px(16), glow_c + (100,))
-    dr = ImageDraw.Draw(img)
-    circle(dr, rcx, rcy, 6, accent + (255,))
-    circle(dr, rcx - 2, rcy - 2, 2.5, (min(255,accent[0]+80), min(255,accent[1]+80), min(255,accent[2]+80), 200))
-
-    # ── 裂纹 ──
-    random.seed(hash(name))
-    for _ in range(len(shape_list) * 2):
-        cell_pick = random.choice(shape_list)
-        sx = (cell_pick[0] + random.uniform(0.15, 0.85)) * cell
-        sy = (cell_pick[1] + random.uniform(0.15, 0.85)) * cell
-        for seg in range(random.randint(2, 4)):
-            ex = sx + random.uniform(-18, 18)
-            ey = sy + random.uniform(-18, 18)
-            line(dr, sx, sy, ex, ey, crack_c + (180,), 2)
-            line(dr, sx + 0.8, sy + 0.8, ex + 0.8, ey + 0.8, (min(255,crack_c[0]+50), min(255,crack_c[1]+50), min(255,crack_c[2]+50), 60), 1)
-            sx, sy = ex, ey
-
-    # ── 边缘符文小点 ──
-    edge_cells = []
-    for p in shape_list:
-        neighbors = [(p[0]+dx, p[1]+dy) for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]]
-        if any(n not in shape for n in neighbors):
-            edge_cells.append(p)
-    for ec in edge_cells[::2]:
-        rx = (ec[0] + 0.5) * cell
-        ry = (ec[1] + 0.5) * cell
-        circle(dr, rx, ry, 4, glow_c[:3] + (80,))
-        img = add_glow(img, px(rx), px(ry), px(6), glow_c + (40,))
-        dr = ImageDraw.Draw(img)
-
-    # ── 脸部（最后画，覆盖裂纹） ──
-    img = _draw_face(img, cfg, shape, shape_list, avg_x, avg_y, cell)
-    dr = ImageDraw.Draw(img)
-
-    # ── 轮廓描边 ──
-    for (cx2, cy2) in shape:
-        x0 = cx2 * cell
-        y0 = cy2 * cell
-        x1 = x0 + cell
-        y1 = y0 + cell
-        rect(dr, x0 + 1, y0 + 1, x1 - 1, y1 - 1, outline=glow_c[:3] + (100,), ow=1, radius=4)
-
-    # ── 缩小到最终尺寸 ──
-    out_img = img.resize((final_w, final_h), Image.LANCZOS)
-    gdr = ImageDraw.Draw(out_img)
-    for col in range(1, cols):
-        gdr.line([(col * CELL_PX, 0), (col * CELL_PX, final_h)], fill=glow_c[:3] + (25,), width=1)
-    for row in range(1, rows):
-        gdr.line([(0, row * CELL_PX), (final_w, row * CELL_PX)], fill=glow_c[:3] + (25,), width=1)
-
-    path = os.path.join(OUT, f"boss_{name}.png")
-    out_img.save(path)
-    print(f"saved boss_{name}.png  ({final_w}x{final_h})")
-
-
-def _draw_face(img, cfg, shape, shape_list, avg_x, avg_y, cell):
-    """Draw face (eyes + mouth) strictly clipped to body cells."""
-    glow_c = cfg["glow"]
-    eye_c = cfg["eye"]
-    body = cfg["body"]
-
-    # ── Build body mask for clipping ──
-    body_mask = Image.new("L", img.size, 0)
-    bm_dr = ImageDraw.Draw(body_mask)
-    for (cx, cy) in shape:
-        x0, y0 = px(cx * cell), px(cy * cell)
-        x1, y1 = px((cx + 1) * cell), px((cy + 1) * cell)
-        bm_dr.rectangle([x0, y0, x1, y1], fill=255)
-
-    # ── Face layer (all face features drawn here, clipped later) ──
-    face = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    dr = ImageDraw.Draw(face)
-
-    min_y = min(p[1] for p in shape_list)
-    face_span = _choose_face_span(shape_list, min_y)
-    face_cells = [(x, face_span["y"]) for x in range(face_span["start"], face_span["end"] + 1)]
-
-    # ── Eye cell selection ──
-    if len(face_cells) >= 5:
-        eye_left = face_cells[1]
-        eye_right = face_cells[-2]
-    elif len(face_cells) >= 3:
-        eye_left = face_cells[0]
-        eye_right = face_cells[-1]
-    elif len(face_cells) == 2:
-        eye_left = face_cells[0]
-        eye_right = face_cells[1]
-    else:
-        eye_left = face_cells[0]
-        eye_right = face_cells[0]
-
-    eye_inset = 0.34 if len(face_cells) <= 2 else 0.5
-    if eye_left == eye_right:
-        eye_positions = [
-            ((eye_left[0] + 0.35) * cell, (eye_left[1] + 0.46) * cell),
-            ((eye_right[0] + 0.65) * cell, (eye_right[1] + 0.46) * cell),
-        ]
-    else:
-        eye_positions = [
-            ((eye_left[0] + eye_inset) * cell, (eye_left[1] + 0.46) * cell),
-            ((eye_right[0] + (1.0 - eye_inset)) * cell, (eye_right[1] + 0.46) * cell),
-        ]
-
-    # ── Draw eyes on face layer ──
-    eye_socket_w = min(14, max(9, int(cell * 0.13)))
-    eye_socket_h = min(10, max(7, int(cell * 0.09)))
-    eye_outer_r = min(7, max(5, int(cell * 0.11)))
-    eye_inner_r = max(3, eye_outer_r - 3)
-    eye_highlight_r = max(1.5, eye_inner_r * 0.4)
-
-    for ex, ey in eye_positions:
-        bg_c = tuple(max(0, c - 15) for c in body)
-        rect(dr, ex - eye_socket_w, ey - eye_socket_h,
-             ex + eye_socket_w, ey + eye_socket_h, fill=bg_c + (255,), radius=8)
-        rect(dr, ex - eye_socket_w + 2, ey - eye_socket_h + 2,
-             ex + eye_socket_w - 2, ey + eye_socket_h - 2, fill=(8, 8, 12, 255), radius=7)
-        face = add_glow(face, px(ex), px(ey), px(10), glow_c + (140,))
-        dr = ImageDraw.Draw(face)
-        circle(dr, ex, ey, eye_outer_r, eye_c + (255,))
-        bright = (min(255, eye_c[0]+100), min(255, eye_c[1]+100), min(255, eye_c[2]+100))
-        circle(dr, ex, ey, eye_inner_r, bright + (255,))
-        circle(dr, ex - eye_outer_r * 0.35, ey - eye_outer_r * 0.35,
-               eye_highlight_r, (255, 255, 255, 220))
-
-    # ── Mouth on face layer ──
-    mouth_span = _choose_mouth_span(shape_list, face_span)
-    mouth_cells = [(x, mouth_span["y"]) for x in range(mouth_span["start"], mouth_span["end"] + 1)]
-
-    if mouth_cells:
-        max_cells = 3 if len(mouth_cells) >= 3 else len(mouth_cells)
-        mouth_mid = len(mouth_cells) // 2
-        mouth_start = max(0, mouth_mid - (max_cells // 2))
-        mouth_end = mouth_start + max_cells
-        mouth_cells = mouth_cells[mouth_start:mouth_end]
-
-        mx_left = (mouth_cells[0][0] + 0.24) * cell
-        mx_right = (mouth_cells[-1][0] + 0.76) * cell
-        my = (mouth_cells[0][1] + 0.68) * cell
-        mouth_h = min(12, max(8, int(cell * 0.18)))
-
-        bg_c = tuple(max(0, c - 15) for c in body)
-        rect(dr, mx_left - 3, my - mouth_h * 0.5 - 2, mx_right + 3, my + mouth_h * 0.5 + 2,
-             fill=bg_c + (255,), radius=4)
-        rect(dr, mx_left, my - mouth_h * 0.5, mx_right, my + mouth_h * 0.5,
-             fill=(12, 8, 14, 255), radius=4)
-        rect(dr, mx_left + 3, my - mouth_h * 0.25, mx_right - 3, my + mouth_h * 0.25,
-             fill=(60, 10, 10, 200), radius=2)
-
-        tooth_w = min(7, max(5, int(cell * 0.1)))
-        n_teeth = max(2, int((mx_right - mx_left) / (tooth_w + 4)))
-        spacing = (mx_right - mx_left) / n_teeth
-        for i in range(n_teeth):
-            tx = mx_left + i * spacing + spacing * 0.22
-            poly(dr, [(tx, my - mouth_h * 0.5),
-                      (tx + tooth_w * 0.5, my - mouth_h * 0.5 + 7),
-                      (tx + tooth_w, my - mouth_h * 0.5)],
-                 fill=(210, 210, 195, 255))
-            poly(dr, [(tx + spacing * 0.08, my + mouth_h * 0.5),
-                      (tx + tooth_w * 0.5, my + mouth_h * 0.5 - 6),
-                      (tx + tooth_w - spacing * 0.08, my + mouth_h * 0.5)],
-                 fill=(190, 190, 175, 255))
-
-    # ── Clip face layer to body mask, composite ──
-    face_a = face.split()[3]
-    clipped_a = ImageChops.multiply(face_a, body_mask)
-    face.putalpha(clipped_a)
-    return Image.alpha_composite(img, face)
-
 def gen_boss():
-    """生成所有Boss贴图"""
-    for name, cfg in BOSS_CONFIGS.items():
-        gen_boss_sheet(name, cfg)
-    # 通用受击叠加层（取最大尺寸）
-    max_w = max(c["cols"] for c in BOSS_CONFIGS.values()) * CELL_PX
-    max_h = max(c["rows"] for c in BOSS_CONFIGS.values()) * CELL_PX
-    hit = Image.new("RGBA", (max_w, max_h), (0, 0, 0, 0))
-    hdr = ImageDraw.Draw(hit)
-    hdr.rounded_rectangle([2, 2, max_w-2, max_h-2], radius=10, fill=(255, 255, 255, 70))
-    hit.save(os.path.join(OUT, "boss_hit_overlay.png"))
-    print("saved boss_hit_overlay.png")
-def gen_bombs():
-    """地牢像素风炸弹图标 32x32 — 圆形炸弹+不同符文标记"""
-    bdir = os.path.join(OUT, "..", "bombs")
-    os.makedirs(bdir, exist_ok=True)
-    S = 6
-    SZ = 32 * S
-
-    configs = {
-        "cross":   {"body": (55, 55, 60), "rune": (255, 60, 50),  "glow": (255, 80, 60, 120)},
-        "scatter": {"body": (55, 55, 60), "rune": (255, 180, 40), "glow": (255, 200, 60, 120)},
-        "bounce":  {"body": (55, 55, 60), "rune": (40, 220, 220), "glow": (60, 240, 240, 120)},
-        "pierce":  {"body": (55, 55, 60), "rune": (240, 240, 60), "glow": (255, 255, 80, 120)},
-        "area":    {"body": (55, 55, 60), "rune": (200, 60, 255), "glow": (220, 80, 255, 120)},
-    }
-
-    for name, cfg in configs.items():
-        img = Image.new("RGBA", (SZ, SZ), (0, 0, 0, 0))
-        dr = ImageDraw.Draw(img)
-        cx = cy = SZ // 2
-        r = SZ // 2 - 4 * S
-
-        # 阴影
-        dr.ellipse([cx - r + 2 * S, cy - r + 4 * S, cx + r + 2 * S, cy + r + 4 * S],
-                   fill=(0, 0, 0, 60))
-        # 深色外圈（铁壳）
-        dark = tuple(max(0, c - 25) for c in cfg["body"])
-        dr.ellipse([cx - r, cy - r, cx + r, cy + r], fill=dark + (255,))
-        # 主体
-        dr.ellipse([cx - r + S, cy - r + S, cx + r - S, cy + r - S], fill=cfg["body"] + (255,))
-        # 噪点质感
-        for _ in range(80):
-            nx = random.randint(cx - r + 2 * S, cx + r - 2 * S)
-            ny = random.randint(cy - r + 2 * S, cy + r - 2 * S)
-            sh = random.randint(-10, 10)
-            nc = tuple(max(0, min(255, cfg["body"][i] + sh)) for i in range(3))
-            dr.rectangle([nx, ny, nx + S, ny + S], fill=nc + (50,))
-        # 高光
-        dr.ellipse([cx - r + 3 * S, cy - r + 2 * S, cx - r + 9 * S, cy - r + 7 * S],
-                   fill=(255, 255, 255, 140))
-        dr.ellipse([cx - r + 4 * S, cy - r + 3 * S, cx - r + 7 * S, cy - r + 5 * S],
-                   fill=(255, 255, 255, 200))
-
-        # 发光符文（每种炸弹不同）
-        rc = cfg["rune"]
-        img = add_glow(img, cx, cy, int(r * 0.6), cfg["glow"])
-        dr = ImageDraw.Draw(img)
-
-        if name == "cross":
-            line(dr, cx // S - 6, cy // S, cx // S + 6, cy // S, rc + (255,), 2)
-            line(dr, cx // S, cy // S - 6, cx // S, cy // S + 6, rc + (255,), 2)
-        elif name == "scatter":
-            for angle in range(0, 360, 60):
-                a = math.radians(angle)
-                ex = cx + int(r * 0.4 * math.cos(a))
-                ey = cy + int(r * 0.4 * math.sin(a))
-                dr.ellipse([ex - S, ey - S, ex + S, ey + S], fill=rc + (255,))
-        elif name == "bounce":
-            pts = []
-            for i in range(5):
-                a = math.radians(i * 72 - 90)
-                pts.append((cx + int(r * 0.45 * math.cos(a)), cy + int(r * 0.45 * math.sin(a))))
-            for i in range(len(pts)):
-                x0, y0 = pts[i]
-                x1, y1 = pts[(i + 1) % len(pts)]
-                dr.line([x0, y0, x1, y1], fill=rc + (255,), width=int(1.5 * S))
-        elif name == "pierce":
-            # 向上箭头
-            poly(dr, [
-                (cx // S, cy // S - 7),
-                (cx // S + 5, cy // S),
-                (cx // S + 2, cy // S),
-                (cx // S + 2, cy // S + 6),
-                (cx // S - 2, cy // S + 6),
-                (cx // S - 2, cy // S),
-                (cx // S - 5, cy // S),
-            ], fill=rc + (255,))
-        elif name == "area":
-            rect(dr, cx // S - 5, cy // S - 5, cx // S + 5, cy // S + 5,
-                 fill=None, outline=rc + (255,), ow=2, radius=1)
-            rect(dr, cx // S - 3, cy // S - 3, cx // S + 3, cy // S + 3,
-                 fill=rc + (200,), radius=0)
-
-        # 引线
-        fuse_pts = [
-            (int(cx + r * 0.5), int(cy - r * 0.7)),
-            (int(cx + r * 0.75), int(cy - r * 0.95)),
-            (int(cx + r * 1.0), int(cy - r * 1.15)),
-        ]
-        dr.line(fuse_pts, fill=(120, 100, 50, 255), width=2 * S)
-        dr.line(fuse_pts, fill=(180, 150, 70, 200), width=S)
-
-        # 引线火花
-        fsx, fsy = fuse_pts[-1]
-        for angle in range(0, 360, 45):
-            a = math.radians(angle)
-            length = S * (3 + (angle % 3))
-            dr.line([fsx, fsy, int(fsx + length * math.cos(a)), int(fsy + length * math.sin(a))],
-                    fill=(255, 220, 60, 200), width=S)
-        dr.ellipse([fsx - 2 * S, fsy - 2 * S, fsx + 2 * S, fsy + 2 * S],
-                   fill=(255, 250, 180, 255))
-
-        out = img.resize((32, 32), Image.LANCZOS)
-        path = os.path.join(bdir, name + ".png")
-        out.save(path)
-        print("saved", path)
-
+    print("Generating 20 boss sprites (organic silhouette style)...")
+    for name, (func, cols, rows) in BOSSES.items():
+        path = os.path.join(OUT, f"boss_{name}.png")
+        func(path)
+    print(f"Done! {len(BOSSES)} bosses generated.")
 
 if __name__ == "__main__":
     gen_boss()
-    gen_bombs()
-    print("All done!")

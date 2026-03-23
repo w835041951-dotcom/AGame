@@ -8,90 +8,80 @@ signal story_finished
 # 每帧数据：图片路径 + 对白文本 + 显示时长 + 特效
 const STORY_FRAMES = [
 	{
-		"image":    "res://assets/sprites/story/story_01_kingdom.png",
+		"image":    "res://assets/sprites/story/story_01_world.png",
 		"lines":    [
-			"…Kha'lithë vorn amethaal…",
-			"",
-			"很久以前，一座城堡矗立在世界的尽头。",
-			"与世隔绝的王国，在晨雾中沉睡了千年。",
+			"传说，世界由十座浮空之境相连。",
+			"竹林、齿轮、深海、熔岩、月华……",
+			"万物在此共生，岁月静好。",
 		],
 		"duration": 3.5,
 		"sfx":      "mine_reveal",
-		"effect":   "pan_right",       # 缓慢右移镜头
-		"particles": "firefly",        # 萤火虫
+		"effect":   "pan_right",
+		"particles": "firefly",
 	},
 	{
-		"image":    "res://assets/sprites/story/story_02_kidnap.png",
+		"image":    "res://assets/sprites/story/story_02_invasion.png",
 		"lines":    [
-			"…Vor'zha ekh muul rethaan…",
-			"",
-			"大地震颤，天空撕裂。",
-			"深渊魔王从裂缝中降临——",
-			"公主被拖入了无尽的黑暗。",
+			"直到——裂缝出现。",
+			"虚空的力量渗入每一座境界。",
+			"怪物从裂隙中涌出，十境陷入混乱。",
 		],
 		"duration": 4.0,
 		"sfx":      "boss_hit",
-		"effect":   "shake",           # 震动
-		"particles": "ember",          # 火星
-		"flash":    true,              # 闪白
-	},
-	{
-		"image":    "res://assets/sprites/story/story_02b_bombs_stolen.png",
-		"lines":    [
-			"…Ghal'uth tharr… okh'mahaan…",
-			"",
-			"魔王的军队掠夺了一切——",
-			"锻造炉熄灭，兵器被夺走。",
-			"火药的力量，从此被封入地牢最深处。",
-		],
-		"duration": 4.0,
-		"sfx":      "mine_bomb",
-		"effect":   "zoom_in",         # 慢慢推进
-		"particles": "dark_ash",       # 暗色灰烬
+		"effect":   "shake",
+		"particles": "ember",
+		"flash":    true,
 	},
 	{
 		"image":    "res://assets/sprites/story/story_03_hero.png",
 		"lines":    [
-			"…Ahnn… sahv'reth dhoumaal kine…",
-			"",
 			"废墟之中，一个身影站了起来。",
-			"炸弹人——唯一听懂火药低语的人。",
+			"炸弹人——唯一能引爆封印之力的人。",
 			"",
-			"「……我去。」",
+			"「……交给我。」",
 		],
 		"duration": 4.0,
 		"sfx":      "bomb_place",
-		"effect":   "zoom_out",        # 从近处拉远，英雄登场
-		"particles": "dust",           # 灰尘
+		"effect":   "zoom_out",
+		"particles": "dust",
 	},
 	{
-		"image":    "res://assets/sprites/story/story_04_dungeon.png",
+		"image":    "res://assets/sprites/story/story_04_journey.png",
 		"lines":    [
-			"地牢在脚下无限延伸。",
-			"每一层，都有古老的陷阱和沉睡的炸弹……",
-			"探索、收集、引爆。",
-			"这就是唯一的前进方式。",
+			"从竹林秘境出发，穿越十座境界。",
+			"每一层，都有沉睡的炸弹和觉醒的守卫。",
+			"探索、收集、引爆——",
+			"这就是前进的唯一方式。",
 		],
 		"duration": 4.0,
 		"sfx":      "mine_bomb",
-		"effect":   "pan_down",        # 向下平移（深入地牢感）
+		"effect":   "pan_down",
 		"particles": "dust",
 	},
 	{
 		"image":    "res://assets/sprites/story/story_05_victory.png",
 		"lines":    [
-			"…Kethaal… orn vahlee ith…",
+			"每击败一个守卫，封印便松动一分。",
+			"力量在积累，希望在生长。",
+		],
+		"duration": 3.5,
+		"sfx":      "upgrade_pick",
+		"effect":   "zoom_in",
+		"particles": "sparkle",
+	},
+	{
+		"image":    "res://assets/sprites/story/story_06_final.png",
+		"lines":    [
+			"当十境之门全部打开——",
+			"虚空深渊的虚空神将在终焉等待。",
 			"",
-			"也许第100层的尽头，会有光。",
-			"也许不会。",
-			"",
-			"但，踏出这一步的人——",
-			"不需要答案。",
+			"无论结局如何，",
+			"踏出这一步的人——不需要理由。",
 		],
 		"duration": 4.5,
 		"sfx":      "upgrade_pick",
 		"effect":   "zoom_in",
-		"particles": "sparkle",        # 金色闪光
+		"particles": "sparkle",
 		"flash":    true,
 	},
 ]

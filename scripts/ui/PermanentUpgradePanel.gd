@@ -11,7 +11,7 @@ func _ready():
 func show_choices(upgrades: Array):
 	visible = true
 	title_label.text = "🏆 炸弹强化"
-	_style_title(title_label, Color(1.0, 0.75, 0.2))
+	_style_title(title_label, UIThemeManager.color("text_accent"))
 	for child in choice_container.get_children():
 		child.queue_free()
 	var idx = 0
@@ -30,50 +30,53 @@ func _make_card(upgrade: Dictionary) -> Control:
 	var rarity = upgrade.get("rarity", "common")
 	var rarity_col = _rarity_color(rarity)
 	var rarity_bg  = _rarity_bg(rarity)
+	var tm = UIThemeManager
 
 	var card = Panel.new()
-	card.custom_minimum_size = Vector2(300, 180)
+	card.custom_minimum_size = Vector2(320, 240)
 
-	var style = StyleBoxFlat.new()
-	style.bg_color = rarity_bg
-	style.border_color = rarity_col
-	style.border_width_left = 3
-	style.border_width_right = 3
-	style.border_width_top = 3
-	style.border_width_bottom = 3
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
-	style.shadow_color = Color(0, 0, 0, 0.5)
-	style.shadow_size = 4
-	card.add_theme_stylebox_override("panel", style)
+	var card_tex_name = "card_" + rarity
+	var card_sb = tm.make_themed_stylebox(card_tex_name, "", "")
+	if card_sb:
+		card.add_theme_stylebox_override("panel", card_sb)
+	else:
+		var style = StyleBoxFlat.new()
+		style.bg_color = rarity_bg
+		style.border_color = rarity_col
+		style.set_border_width_all(3)
+		style.set_corner_radius_all(int(tm.color("corner_radius")))
+		style.shadow_color = tm.color("card_shadow")
+		style.shadow_size = 6
+		card.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	vbox.add_theme_constant_override("separation", 8)
+	vbox.add_theme_constant_override("separation", 10)
 	card.add_child(vbox)
 
 	var rarity_lbl = Label.new()
 	rarity_lbl.text = _rarity_text(rarity)
 	rarity_lbl.add_theme_color_override("font_color", rarity_col)
-	rarity_lbl.add_theme_font_size_override("font_size", 11)
+	rarity_lbl.add_theme_font_size_override("font_size", 13)
 	rarity_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rarity_lbl.add_theme_constant_override("margin_top", 12)
+	rarity_lbl.add_theme_constant_override("margin_top", 16)
 	vbox.add_child(rarity_lbl)
 
 	var name_lbl = Label.new()
 	name_lbl.text = upgrade["name"]
-	name_lbl.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85))
-	name_lbl.add_theme_font_size_override("font_size", 22)
+	name_lbl.add_theme_color_override("font_color", UIThemeManager.color("card_name_text"))
+	name_lbl.add_theme_font_size_override("font_size", 26)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	name_lbl.add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+	name_lbl.add_theme_constant_override("shadow_offset_x", 1)
+	name_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	vbox.add_child(name_lbl)
 
 	var desc_lbl = Label.new()
 	desc_lbl.text = upgrade["description"]
-	desc_lbl.add_theme_color_override("font_color", Color(0.72, 0.70, 0.62))
-	desc_lbl.add_theme_font_size_override("font_size", 14)
+	desc_lbl.add_theme_color_override("font_color", UIThemeManager.color("card_desc_text"))
+	desc_lbl.add_theme_font_size_override("font_size", 16)
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	vbox.add_child(desc_lbl)
@@ -84,18 +87,26 @@ func _make_card(upgrade: Dictionary) -> Control:
 
 	var btn = Button.new()
 	btn.text = "选择"
-	btn.add_theme_font_size_override("font_size", 16)
+	btn.custom_minimum_size = Vector2(0, 44)
+	btn.add_theme_font_size_override("font_size", 20)
 	btn.add_theme_color_override("font_color", Color.WHITE)
-	var btn_style = StyleBoxFlat.new()
-	btn_style.bg_color = rarity_col.darkened(0.3)
-	btn_style.corner_radius_top_left = 0
-	btn_style.corner_radius_top_right = 0
-	btn_style.corner_radius_bottom_left = 6
-	btn_style.corner_radius_bottom_right = 6
-	btn.add_theme_stylebox_override("normal", btn_style)
-	var btn_hover = btn_style.duplicate()
-	btn_hover.bg_color = rarity_col.darkened(0.1)
-	btn.add_theme_stylebox_override("hover", btn_hover)
+	btn.add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+	btn.add_theme_constant_override("shadow_offset_x", 1)
+	btn.add_theme_constant_override("shadow_offset_y", 1)
+	var btn_sb = tm.make_themed_stylebox("btn_normal", "", "")
+	if btn_sb:
+		btn.add_theme_stylebox_override("normal", btn_sb)
+		var btn_hsb = tm.make_themed_stylebox("btn_hover", "", "")
+		if btn_hsb:
+			btn.add_theme_stylebox_override("hover", btn_hsb)
+	else:
+		var btn_style = StyleBoxFlat.new()
+		btn_style.bg_color = rarity_col.darkened(0.3)
+		btn_style.set_corner_radius_all(int(tm.color("corner_radius")))
+		btn.add_theme_stylebox_override("normal", btn_style)
+		var btn_hover = btn_style.duplicate()
+		btn_hover.bg_color = rarity_col.darkened(0.1)
+		btn.add_theme_stylebox_override("hover", btn_hover)
 	btn.pressed.connect(func(): _on_chosen(upgrade))
 	vbox.add_child(btn)
 
@@ -108,20 +119,25 @@ func _on_chosen(upgrade: Dictionary):
 
 func _style_title(lbl: Label, col: Color):
 	lbl.add_theme_color_override("font_color", col)
-	lbl.add_theme_font_size_override("font_size", 28)
+	lbl.add_theme_font_size_override("font_size", 32)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+	lbl.add_theme_constant_override("shadow_offset_x", 2)
+	lbl.add_theme_constant_override("shadow_offset_y", 2)
 
 func _rarity_color(rarity: String) -> Color:
+	var tm = UIThemeManager
 	match rarity:
-		"rare":   return Color(0.35, 0.60, 0.95)
-		"epic":   return Color(0.75, 0.30, 0.92)
-		_:        return Color(0.65, 0.60, 0.50)
+		"rare":   return tm.color("rarity_rare")
+		"epic":   return tm.color("rarity_epic")
+		_:        return tm.color("rarity_common")
 
 func _rarity_bg(rarity: String) -> Color:
+	var tm = UIThemeManager
 	match rarity:
-		"rare":   return Color(0.06, 0.10, 0.22)
-		"epic":   return Color(0.12, 0.04, 0.20)
-		_:        return Color(0.10, 0.09, 0.08)
+		"rare":   return tm.color("rarity_rare_bg")
+		"epic":   return tm.color("rarity_epic_bg")
+		_:        return tm.color("rarity_common_bg")
 
 func _rarity_text(rarity: String) -> String:
 	match rarity:

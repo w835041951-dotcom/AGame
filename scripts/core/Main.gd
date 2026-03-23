@@ -21,21 +21,29 @@ func _ready():
 	GameManager.combat_upgrade_triggered.connect(_on_combat_upgrade)
 	BossGrid.core_destroyed.connect(_on_combat_upgrade)
 	BossGrid.boss_attacked.connect(_on_boss_attacked)
+	BossGrid.phase_changed.connect(_on_boss_phase_changed)
 	ExplosionCalc.damage_numbers.connect(_on_damage_numbers)
+	ExplosionCalc.critical_hit.connect(_on_critical_hit)
 	MinionGrid.all_minions_cleared.connect(_on_all_minions_cleared)
+	hud.reset_board_pressed.connect(_on_reset_board)
+	bomb_selector.reset_board_pressed.connect(_on_reset_board)
+	GameManager.lucky_find.connect(_on_lucky_find)
+	GameManager.streak_bonus.connect(_on_streak_bonus)
 
 	combat_upgrade_panel.visible = false
 	permanent_upgrade_panel.visible = false
 
-	# 给玩家初始炸弹，避免第一回合无弹可用
+	# 给玩家初始炸弹，第一回合有足够弹药
 	GameManager.add_bomb("pierce_h")
 	GameManager.add_bomb("pierce_h")
+	GameManager.add_bomb("pierce_v")
 	GameManager.add_bomb("pierce_v")
 
 	_start_new_floor()
 
 func _start_new_floor():
 	_apply_floor_background()
+	# 显示剧情卡片（如有）
 	await _show_story_card_if_needed()
 	# 显示关卡标题
 	await _show_level_intro()
@@ -61,12 +69,16 @@ func _layout_views():
 	var cs = LevelData.get_cell_size(floor_n)
 	var p_cols = BossGrid.placement_cols
 	var p_rows = BossGrid.placement_rows
-	var m_cols = GridManager.cols if GridManager.cols > 1 else LevelData.get_mine_cols(floor_n)
+	var m_cols = LevelData.get_mine_cols(floor_n)
 	var m_rows = LevelData.get_mine_rows(floor_n)
 	var p_width = p_cols * cs
 	var p_height = p_rows * cs
 	var m_width = m_cols * cs
 	var m_height = m_rows * cs
+
+	# 两个棋盘取最大宽度，统一居中对齐
+	var max_width = max(p_width, m_width)
+	var center_x = (1920 - max_width) / 2
 
 	# 放置区居中
 	var hud_h = 68
@@ -77,18 +89,18 @@ func _layout_views():
 	var start_y = hud_h + max(0, (1080 - hud_h - total_h) / 2)
 
 	# Boss区域标签
-	var boss_label = _create_section_label("⚔ Boss 战场", (1920 - p_width) / 2, start_y, p_width)
+	var boss_label = _create_section_label("⚔ Boss 战场", center_x, start_y, max_width)
 	_section_labels.append(boss_label)
 
-	placement_view.position = Vector2((1920 - p_width) / 2, start_y + label_h + gap)
+	placement_view.position = Vector2(center_x + (max_width - p_width) / 2, start_y + label_h + gap)
 	bomb_selector.position.y = start_y + label_h + gap + p_height + gap
 	bomb_selector.size.x = 1920
 
 	var mine_top = start_y + label_h + gap + p_height + sel_h + gap * 2
 	# 探索区域标签
-	var mine_label = _create_section_label("🔍 探索区", (1920 - m_width) / 2, mine_top, m_width)
+	var mine_label = _create_section_label("🔍 探索区", center_x, mine_top, max_width)
 	_section_labels.append(mine_label)
-	mine_view.position = Vector2((1920 - m_width) / 2, mine_top + label_h + gap)
+	mine_view.position = Vector2(center_x + (max_width - m_width) / 2, mine_top + label_h + gap)
 
 func _create_section_label(text_str: String, x: float, y: float, width: float) -> Label:
 	var lbl = Label.new()
@@ -146,7 +158,7 @@ func _show_story_card_if_needed():
 	canvas.add_child(panel)
 
 	var panel_style = StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.05, 0.04, 0.05, 0.94)
+	panel_style.bg_color = UIThemeManager.color("hud_bg")
 	panel_style.border_color = LevelData.get_level_color(floor_n).lerp(Color(1, 1, 1, 1), 0.2)
 	panel_style.set_border_width_all(3)
 	panel_style.set_corner_radius_all(18)
@@ -176,7 +188,7 @@ func _show_story_card_if_needed():
 	body.size = Vector2(470, 320)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_theme_font_size_override("font_size", 26)
-	body.add_theme_color_override("font_color", Color(0.84, 0.82, 0.78))
+	body.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
 	panel.add_child(body)
 
 	var hint = Label.new()
@@ -184,7 +196,7 @@ func _show_story_card_if_needed():
 	hint.position = Vector2(1020, 720)
 	hint.size = Vector2(420, 40)
 	hint.add_theme_font_size_override("font_size", 20)
-	hint.add_theme_color_override("font_color", Color(0.65, 0.62, 0.58, 0.85))
+	hint.add_theme_color_override("font_color", UIThemeManager.color("text_secondary").darkened(0.2))
 	panel.add_child(hint)
 
 	var tw = create_tween()
@@ -198,113 +210,51 @@ func _show_story_card_if_needed():
 
 func _show_level_intro():
 	var floor_n = GameManager.floor_number
-	var level_name = LevelData.get_level_name(floor_n)
 	var boss_name = LevelData.get_boss_name(floor_n)
-	var subtitle = LevelData.get_level_subtitle(floor_n)
 	var level_color = LevelData.get_level_color(floor_n)
-	var cycle = LevelData.get_cycle(floor_n)
 
 	var canvas = CanvasLayer.new()
 	canvas.layer = 90
 	add_child(canvas)
 
-	# 暗背景
 	var bg = ColorRect.new()
 	bg.color = UIThemeManager.color("intro_overlay")
 	bg.size = Vector2(1920, 1080)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	canvas.add_child(bg)
 
-	# 古语旁白（神秘低语）
-	var whisper = Label.new()
-	whisper.text = _get_level_whisper(floor_n)
-	whisper.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	whisper.position = Vector2(0, 300)
-	whisper.size = Vector2(1920, 40)
-	whisper.add_theme_font_size_override("font_size", 18)
-	whisper.add_theme_color_override("font_color", UIThemeManager.color("whisper_text"))
-	whisper.modulate = Color(1, 1, 1, 0)
-	bg.add_child(whisper)
-
-	# 层数
-	var floor_label = Label.new()
-	floor_label.text = "第 %d 层" % floor_n
-	floor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	floor_label.position = Vector2(0, 340)
-	floor_label.size = Vector2(1920, 50)
-	floor_label.add_theme_font_size_override("font_size", 32)
-	floor_label.add_theme_color_override("font_color", UIThemeManager.color("floor_text"))
-	floor_label.modulate = Color(1, 1, 1, 0)
-	bg.add_child(floor_label)
-
-	# 关卡名
+	# 「第 X 层  Boss名」 一行搞定
 	var title = Label.new()
-	var cycle_mark = "" if cycle == 0 else " · %d周目" % (cycle + 1)
-	title.text = level_name + cycle_mark
+	title.text = "第 %d 层 — %s" % [floor_n, boss_name]
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 380)
+	title.position = Vector2(0, 440)
 	title.size = Vector2(1920, 100)
-	title.add_theme_font_size_override("font_size", 80)
+	title.add_theme_font_size_override("font_size", 64)
 	title.add_theme_color_override("font_color", level_color)
 	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	title.add_theme_constant_override("shadow_offset_x", 3)
 	title.add_theme_constant_override("shadow_offset_y", 3)
 	title.modulate = Color(1, 1, 1, 0)
+	title.pivot_offset = Vector2(960, 50)
 	bg.add_child(title)
 
-	# Boss名字
-	var boss_label = Label.new()
-	boss_label.text = "Boss: " + boss_name
-	boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	boss_label.position = Vector2(0, 490)
-	boss_label.size = Vector2(1920, 50)
-	boss_label.add_theme_font_size_override("font_size", 34)
-	boss_label.add_theme_color_override("font_color", UIThemeManager.color("boss_label"))
-	boss_label.modulate = Color(1, 1, 1, 0)
-	bg.add_child(boss_label)
-
-	# 副标题
-	var sub = Label.new()
-	sub.text = subtitle
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub.position = Vector2(0, 550)
-	sub.size = Vector2(1920, 50)
-	sub.add_theme_font_size_override("font_size", 26)
-	sub.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
-	sub.modulate = Color(1, 1, 1, 0)
-	bg.add_child(sub)
-
-	# ── 动画 ──
 	var tw = create_tween()
-	tw.tween_property(whisper, "modulate:a", 0.7, 0.5)
-	tw.tween_interval(0.3)
-	tw.tween_property(floor_label, "modulate:a", 1.0, 0.3)
-	tw.tween_property(title, "modulate:a", 1.0, 0.4)
-	tw.tween_property(boss_label, "modulate:a", 1.0, 0.3)
-	tw.tween_property(sub, "modulate:a", 1.0, 0.4)
-	tw.tween_interval(1.2)
-	tw.tween_property(bg, "modulate:a", 0.0, 0.5)
+	tw.tween_property(title, "modulate:a", 1.0, 0.3)
+	tw.tween_property(title, "scale", Vector2(1.05, 1.05), 0.15).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(title, "scale", Vector2.ONE, 0.1)
+	tw.tween_interval(0.8)
+	tw.tween_property(bg, "modulate:a", 0.0, 0.35)
 	tw.tween_callback(canvas.queue_free)
-
-	# 等动画结束
 	await tw.finished
-
-const LEVEL_WHISPERS = [
-	["Kha'lithë… vorn amethaal…", "Duur okh… shtaan reeve…", "Mogh'raal vaan ethith…"],
-	["Zhe'kuur… arraas thol…", "Vor'itha… mal'kaan dul…", "Sht'maas okh reethaal…"],
-	["Ighn'raal… vhoum tesh'kaa…", "Bharr okh'muul dhaan…", "Zaan'veth uur tholiim…"],
-	["Keth'uur… shaal marr'goth…", "Dhuum vaan… reth'aal kine…", "Okh'shaal muur taan'gal…"],
-	["Maal'veth… orn gha'tuum…", "Zur'aan eth… kethaal ruum…", "Ghaal'ith vhoum daan'sheth…"],
-]
-
-func _get_level_whisper(floor_n: int) -> String:
-	var idx = (floor_n - 1) % LEVEL_WHISPERS.size()
-	var whispers = LEVEL_WHISPERS[idx]
-	return whispers[randi() % whispers.size()]
 
 func _on_turn_ended():
 	if BombPlacer.phase == BombPlacer.Phase.PLACING:
-		await BombPlacer.detonate()
+		var dmg = await BombPlacer.detonate()
+		# 等爆炸动画播完再显示伤害统计
+		await get_tree().create_timer(0.3).timeout
+		if dmg > 0:
+			_show_damage_summary(dmg)
+			await get_tree().create_timer(0.8).timeout  # 让统计弹窗显示一会儿
 	# 等待临时升级面板（如有）关闭后再继续
 	await _wait_for_combat_upgrade()
 	_after_detonation()
@@ -316,21 +266,34 @@ func _wait_for_combat_upgrade():
 func _after_detonation():
 	if GameManager.boss_hp <= 0:
 		return
-	await get_tree().create_timer(0.4).timeout
+	await get_tree().create_timer(0.5).timeout
 	# 小怪阶段时Boss不移动
 	if not MinionGrid.has_minions():
 		if UpgradeManager.is_boss_frozen():
 			UpgradeManager.consume_freeze_boss()
 		else:
 			BossGrid.random_move()
-	await get_tree().create_timer(0.2).timeout
+			await get_tree().create_timer(0.6).timeout  # Boss移动/攻击动画时间
+	await get_tree().create_timer(0.4).timeout
 	if GameManager.player_hp <= 0:
 		return
 	BombPlacer.reset()
 	GameManager.start_turn()
 
+func _on_reset_board():
+	# 重置扫雷区并立即进入下一回合
+	if BombPlacer.phase != BombPlacer.Phase.PLACING:
+		return
+	GridManager.reset_for_new_floor()
+	GridManager.generate_grid()
+	mine_view._build_grid()
+	GameManager.end_turn()
+
 func _on_boss_attacked(attack_type: int):
-	var base_atk = LevelData.get_boss_attack(GameManager.floor_number)
+	var raw_atk = LevelData.get_boss_attack(GameManager.floor_number)
+	var hp_ratio = float(GameManager.boss_hp) / max(GameManager.boss_max_hp, 1)
+	var alive_ratio = BossGrid.alive_ratio()
+	var base_atk = max(1, int(raw_atk * hp_ratio * alive_ratio))
 	match attack_type:
 		BossGrid.AttackType.SLAM:
 			# 重击：双倍伤害 + 强烈震屏
@@ -396,16 +359,62 @@ func _on_combat_upgrade():
 func _on_boss_defeated():
 	# 关掉可能还在等待的临时升级面板，避免 _wait_for_combat_upgrade 死锁
 	combat_upgrade_panel.visible = false
-	# 先等爆炸动画看完
-	await get_tree().create_timer(0.8).timeout
+	# Boss死亡序列：震屏 + 逐格爆碎 + 闪光
+	await get_tree().create_timer(0.3).timeout  # 让最后一击伤害数字先显示
+	_screen_shake(18.0, 0.6)
+	_show_boss_death_flash()
+	await placement_view.play_boss_death_sequence()
+	await get_tree().create_timer(0.3).timeout  # 爆碎完喘息一下
+	_show_boss_defeated_label()
+	await get_tree().create_timer(0.8).timeout  # 让"Boss击破"标签充分展示
 	# 结算正确标记回血
 	var correct = mine_view.count_correct_marks()
 	if correct > 0:
 		await _show_mark_heal_animation(correct)
+		await get_tree().create_timer(0.3).timeout
 	# 再显示永久升级面板
-	await get_tree().create_timer(0.3).timeout
+	await get_tree().create_timer(0.4).timeout
 	permanent_upgrade_panel.show_choices(UpgradeManager.get_permanent_choices(3))
 	_animate_panel_in(permanent_upgrade_panel)
+
+func _show_boss_death_flash():
+	var canvas = CanvasLayer.new()
+	canvas.layer = 75
+	add_child(canvas)
+	var flash = ColorRect.new()
+	flash.color = Color(1.0, 0.9, 0.6, 0.0)
+	flash.size = Vector2(1920, 1080)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(flash)
+	var tw = create_tween()
+	tw.tween_property(flash, "color:a", 0.7, 0.1)
+	tw.tween_property(flash, "color:a", 0.0, 0.8).set_trans(Tween.TRANS_EXPO)
+	tw.tween_callback(canvas.queue_free)
+
+func _show_boss_defeated_label():
+	var canvas = CanvasLayer.new()
+	canvas.layer = 85
+	add_child(canvas)
+	var lbl = Label.new()
+	lbl.text = "Boss 击破！"
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, 420)
+	lbl.size = Vector2(1920, 120)
+	lbl.add_theme_font_size_override("font_size", 88)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	lbl.add_theme_color_override("font_shadow_color", Color(0.6, 0.15, 0.0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 4)
+	lbl.add_theme_constant_override("shadow_offset_y", 4)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 60)
+	canvas.add_child(lbl)
+	var tw = create_tween()
+	tw.tween_property(lbl, "modulate:a", 1.0, 0.12)
+	tw.tween_property(lbl, "scale", Vector2(1.12, 1.12), 0.15).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(lbl, "scale", Vector2.ONE, 0.12)
+	tw.tween_interval(0.8)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(canvas.queue_free)
 
 func _show_mark_heal_animation(count: int):
 	AudioManager.play_sfx("upgrade_pick")
@@ -513,7 +522,7 @@ func _show_game_over_screen():
 	var sep = Label.new()
 	sep.text = "━━━━━━━━━━━━━━━━━━━━"
 	sep.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sep.position = Vector2(0, 450)
+	sep.position = Vector2(0, 400)
 	sep.size = Vector2(1920, 40)
 	sep.add_theme_font_size_override("font_size", 24)
 	sep.add_theme_color_override("font_color", (UIThemeManager.color("text_danger") as Color).darkened(0.3).lerp(Color.TRANSPARENT, 0.4))
@@ -525,7 +534,7 @@ func _show_game_over_screen():
 	info.text = "你倒在了第 %d 层" % GameManager.floor_number
 	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	info.position = Vector2(0, 540)
+	info.position = Vector2(0, 480)
 	info.size = Vector2(1920, 60)
 	info.add_theme_font_size_override("font_size", 42)
 	info.add_theme_color_override("font_color", UIThemeManager.color("text_accent"))
@@ -535,12 +544,48 @@ func _show_game_over_screen():
 	info.modulate = Color(1, 1, 1, 0)
 	overlay.add_child(info)
 
+	# ── 战斗统计 ──
+	var stats_text = "⚡ 总伤害: %d    💣 炸弹使用: %d    🔗 最大连锁: %d    🏆 通过层数: %d" % [
+		GameManager.stat_total_damage,
+		GameManager.stat_bombs_used,
+		GameManager.stat_max_chain,
+		GameManager.stat_floors_cleared
+	]
+	var stats = Label.new()
+	stats.text = stats_text
+	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	stats.position = Vector2(0, 560)
+	stats.size = Vector2(1920, 50)
+	stats.add_theme_font_size_override("font_size", 26)
+	stats.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
+	stats.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	stats.add_theme_constant_override("shadow_offset_x", 1)
+	stats.add_theme_constant_override("shadow_offset_y", 1)
+	stats.modulate = Color(1, 1, 1, 0)
+	overlay.add_child(stats)
+
+	# ── 评价 ──
+	var rating_text = _get_run_rating()
+	var rating = Label.new()
+	rating.text = rating_text
+	rating.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rating.position = Vector2(0, 620)
+	rating.size = Vector2(1920, 50)
+	rating.add_theme_font_size_override("font_size", 30)
+	rating.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	rating.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	rating.add_theme_constant_override("shadow_offset_x", 2)
+	rating.add_theme_constant_override("shadow_offset_y", 2)
+	rating.modulate = Color(1, 1, 1, 0)
+	overlay.add_child(rating)
+
 	# ── 重启提示 ──
 	var hint = Label.new()
 	hint.text = "按 F5 重新开始"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hint.position = Vector2(0, 620)
+	hint.position = Vector2(0, 690)
 	hint.size = Vector2(1920, 50)
 	hint.add_theme_font_size_override("font_size", 28)
 	hint.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
@@ -555,7 +600,7 @@ func _show_game_over_screen():
 	# 2. 标题从上方滑入（带回弹）
 	var tw_t1 = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	tw_t1.tween_interval(0.3)
-	tw_t1.tween_property(title, "position:y", 340.0, 0.7)
+	tw_t1.tween_property(title, "position:y", 280.0, 0.7)
 	var tw_t2 = create_tween().set_ease(Tween.EASE_OUT)
 	tw_t2.tween_interval(0.3)
 	tw_t2.tween_property(title, "modulate:a", 1.0, 0.5)
@@ -568,14 +613,24 @@ func _show_game_over_screen():
 	# 4. 层数信息从下方滑入
 	var tw_i1 = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	tw_i1.tween_interval(1.2)
-	tw_i1.tween_property(info, "position:y", 500.0, 0.5)
+	tw_i1.tween_property(info, "position:y", 440.0, 0.5)
 	var tw_i2 = create_tween().set_ease(Tween.EASE_OUT)
 	tw_i2.tween_interval(1.2)
 	tw_i2.tween_property(info, "modulate:a", 1.0, 0.5)
 
-	# 5. 重启提示淡入 + 呼吸闪烁
+	# 5. 统计数据逐行淡入
+	var tw_s = create_tween().set_ease(Tween.EASE_OUT)
+	tw_s.tween_interval(1.8)
+	tw_s.tween_property(stats, "modulate:a", 1.0, 0.5)
+
+	# 6. 评价淡入
+	var tw_r = create_tween().set_ease(Tween.EASE_OUT)
+	tw_r.tween_interval(2.4)
+	tw_r.tween_property(rating, "modulate:a", 1.0, 0.5)
+
+	# 7. 重启提示淡入 + 呼吸闪烁
 	var tw_h = create_tween()
-	tw_h.tween_interval(2.0)
+	tw_h.tween_interval(3.0)
 	tw_h.tween_property(hint, "modulate:a", 1.0, 0.5)
 	tw_h.tween_callback(func():
 		var pulse = create_tween().set_loops()
@@ -587,6 +642,20 @@ func _show_game_over_screen():
 func on_combat_upgrade_chosen():
 	combat_upgrade_panel.visible = false
 	# 回合流程由 _wait_for_combat_upgrade() 继续，无需手动恢复计时器
+
+func _get_run_rating() -> String:
+	var floor_n = GameManager.floor_number
+	var dmg = GameManager.stat_total_damage
+	if floor_n >= 50:
+		return "🏆 传奇勇者！你的名字将被铭记！"
+	elif floor_n >= 20:
+		return "⭐ 精英冒险家！实力不俗！"
+	elif floor_n >= 10:
+		return "💪 初露锋芒！继续加油！"
+	elif dmg >= 500:
+		return "💥 爆破专家！虽败犹荣！"
+	else:
+		return "🌱 初出茅庐，下次会更好！"
 
 func on_permanent_upgrade_chosen():
 	permanent_upgrade_panel.visible = false
@@ -623,3 +692,128 @@ func _show_boss_enter_label(boss_name: String):
 	tw.tween_interval(0.6)
 	tw.tween_property(lbl, "modulate:a", 0.0, 0.3)
 	tw.tween_callback(canvas.queue_free)
+
+func _on_boss_phase_changed(phase: int):
+	if phase <= 1:
+		return
+	var txt = "Boss P%d" % phase
+	var color = Color(1.0, 0.8, 0.2) if phase == 2 else Color(1.0, 0.2, 0.2)
+	_show_reward_popup(txt, color, 40)
+	_screen_shake(5.0 + phase * 2.0, 0.14)
+# ======== 趣味性系统 ========
+
+# ---- Lucky Find 弹窗 ----
+func _on_lucky_find(_reward_type: String, reward_text: String):
+	_show_reward_popup(reward_text, Color(1.0, 0.85, 0.1), 32)
+
+# ---- Streak Bonus 弹窗 ----
+func _on_streak_bonus(streak: int, reward_text: String):
+	var color = Color(0.2, 1.0, 0.3) if streak < 5 else Color(1.0, 0.5, 0.0) if streak < 7 else Color(1.0, 0.2, 0.8)
+	_show_reward_popup(reward_text, color, 36)
+	_screen_shake(4.0 + streak, 0.15)
+
+# ---- Critical Hit 闪光 ----
+func _on_critical_hit(cell: Vector2i, damage: int):
+	var cs = LevelData.get_cell_size(GameManager.floor_number)
+	var view_pos = placement_view.global_position
+	var wx = view_pos.x + cell.x * cs + cs * 0.5
+	var wy = view_pos.y + cell.y * cs
+
+	var canvas = CanvasLayer.new()
+	canvas.layer = 72
+	add_child(canvas)
+
+	var lbl = Label.new()
+	lbl.text = "暴击! -%d" % damage
+	lbl.add_theme_font_size_override("font_size", 42)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.15, 0.0))
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 3)
+	lbl.add_theme_constant_override("shadow_offset_y", 3)
+	lbl.position = Vector2(wx - 60, wy - 20)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(60, 20)
+	canvas.add_child(lbl)
+
+	var tw2 = create_tween()
+	tw2.tween_property(lbl, "modulate:a", 1.0, 0.06)
+	tw2.parallel().tween_property(lbl, "scale", Vector2(1.3, 1.3), 0.06)
+	tw2.tween_property(lbl, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_BACK)
+	tw2.tween_property(lbl, "position:y", wy - 90, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw2.parallel().tween_property(lbl, "modulate:a", 0.0, 0.3).set_delay(0.3)
+	tw2.tween_callback(canvas.queue_free)
+
+	_screen_shake(6.0, 0.12)
+
+# ---- 通用奖励弹窗（在探索区上方浮出） ----
+func _show_reward_popup(text: String, color: Color, font_size: int = 32):
+	var canvas = CanvasLayer.new()
+	canvas.layer = 75
+	add_child(canvas)
+
+	var lbl = Label.new()
+	lbl.text = "★ %s ★" % text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, mine_view.global_position.y - 50)
+	lbl.size = Vector2(1920, 60)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+	lbl.add_theme_constant_override("shadow_offset_x", 2)
+	lbl.add_theme_constant_override("shadow_offset_y", 2)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 30)
+	canvas.add_child(lbl)
+
+	var tw3 = create_tween()
+	tw3.tween_property(lbl, "modulate:a", 1.0, 0.1)
+	tw3.tween_property(lbl, "scale", Vector2(1.1, 1.1), 0.1).set_trans(Tween.TRANS_BACK)
+	tw3.tween_property(lbl, "scale", Vector2.ONE, 0.08)
+	tw3.tween_interval(0.7)
+	tw3.tween_property(lbl, "position:y", lbl.position.y - 40, 0.35)
+	tw3.parallel().tween_property(lbl, "modulate:a", 0.0, 0.35)
+	tw3.tween_callback(canvas.queue_free)
+
+# ---- 总伤害统计弹窗（引爆后显示） ----
+func _show_damage_summary(total_damage: int):
+	if total_damage <= 0:
+		return
+	var rating: String
+	var rating_color: Color
+	if total_damage >= GameManager.boss_max_hp * 0.5:
+		rating = "毁灭打击！"
+		rating_color = Color(1.0, 0.1, 0.0)
+	elif total_damage >= GameManager.boss_max_hp * 0.25:
+		rating = "强力一击！"
+		rating_color = Color(1.0, 0.6, 0.0)
+	elif total_damage >= GameManager.boss_max_hp * 0.1:
+		rating = "不错！"
+		rating_color = Color(0.3, 1.0, 0.4)
+	else:
+		return  # 小伤害不提示
+
+	var canvas = CanvasLayer.new()
+	canvas.layer = 71
+	add_child(canvas)
+
+	var lbl = Label.new()
+	lbl.text = "%s  ⚡%d 伤害" % [rating, total_damage]
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, 480)
+	lbl.size = Vector2(1920, 80)
+	lbl.add_theme_font_size_override("font_size", 48)
+	lbl.add_theme_color_override("font_color", rating_color)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 3)
+	lbl.add_theme_constant_override("shadow_offset_y", 3)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 40)
+	canvas.add_child(lbl)
+
+	var tw4 = create_tween()
+	tw4.tween_property(lbl, "modulate:a", 1.0, 0.12)
+	tw4.tween_property(lbl, "scale", Vector2(1.15, 1.15), 0.1).set_trans(Tween.TRANS_BACK)
+	tw4.tween_property(lbl, "scale", Vector2.ONE, 0.08)
+	tw4.tween_interval(0.6)
+	tw4.tween_property(lbl, "modulate:a", 0.0, 0.3)
+	tw4.tween_callback(canvas.queue_free)

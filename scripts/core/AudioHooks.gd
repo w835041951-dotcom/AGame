@@ -17,6 +17,7 @@ func _ready():
 	# 探索区
 	GridManager.grid_revealed.connect(func(_x, _y, _d): AudioManager.play_sfx("mine_reveal"))
 	GridManager.bomb_found.connect(func(_x, _y, _t): AudioManager.play_sfx("mine_bomb"))
+	GridManager.special_found.connect(func(_x, _y, st): AudioManager.play_sfx("upgrade_pick" if st == "relic" else "mine_reveal"))
 
 	# 玩家受伤
 	GameManager.game_over.connect(func():
@@ -36,6 +37,23 @@ func _ready():
 	GameManager.turn_started.connect(func():
 		AudioManager.play_bgm("battle")
 	)
+
+	# 连锁爆炸
+	ExplosionCalc.chain_triggered.connect(func(_positions): AudioManager.play_sfx("chain"))
+
+	# 暴击
+	ExplosionCalc.critical_hit.connect(func(_cell, _dmg): AudioManager.play_sfx("boss_hit"))
+
+	# 玩家受伤音效
+	GameManager.player_damaged.connect(func(_amt): AudioManager.play_sfx("player_hit"))
+
+	# Boss攻击
+	BossGrid.boss_attacked.connect(func(_type): AudioManager.play_sfx("boss_hit"))
+	BossGrid.phase_changed.connect(func(_p): AudioManager.play_sfx("upgrade_pick"))
+
+	# 幸运发现 / 连击奖励
+	GameManager.lucky_find.connect(func(_type, _text): AudioManager.play_sfx("mine_bomb"))
+	GameManager.streak_bonus.connect(func(_streak, _text): AudioManager.play_sfx("chain"))
 
 	# 倒计时警告音（每秒一次，当剩余<10s）
 	# 由 HUD 的 _process 触发，见 HUD.gd

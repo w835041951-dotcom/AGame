@@ -8,6 +8,30 @@ signal game_over
 signal boss_defeated
 signal combat_upgrade_triggered
 signal bomb_inventory_changed
+signal lucky_find(reward_type: String, reward_text: String)
+signal streak_bonus(streak: int, reward_text: String)
+signal intel_changed(value: int)
+
+# ---- 连续发现炸弹的连击系统 ----
+var bomb_streak: int = 0  # 当前连续找到炸弹次数
+var total_bombs_found: int = 0  # 本层找到的炸弹总数
+
+# ---- 全局统计（游戏结束后展示） ----
+var stat_total_damage: int = 0  # 本局总共造成伤害
+var stat_max_chain: int = 0  # 本局最大连锁数
+var stat_bombs_used: int = 0  # 本局使用炸弹总数
+var stat_floors_cleared: int = 0  # 本局通过层数
+
+# ---- 双资源：情报值 ----
+var intel_points: int = 0
+var reroll_tokens: int = 0
+
+# ---- 炸弹冷却（过载等效果） ----
+var bomb_cooldowns: Dictionary = {}  # type -> turns
+
+# ---- 每局挑战词条 ----
+var challenge_modifier: String = ""
+var _last_challenge_modifier: String = ""
 
 # ---- 玩家状态 ----
 var player_hp: int = 30
@@ -62,10 +86,14 @@ func use_click() -> bool:
 
 # ---- 炸弹库存 ----
 func add_bomb(type: String):
+	if BombRegistry.is_unique(type) and bomb_inventory.get(type, 0) > 0:
+		return
 	bomb_inventory[type] = bomb_inventory.get(type, 0) + 1
 	bomb_inventory_changed.emit()
 
 func use_bomb(type: String) -> bool:
+	if bomb_cooldowns.get(type, 0) > 0:
+		return false
 	if bomb_inventory.get(type, 0) <= 0:
 		return false
 	bomb_inventory[type] -= 1
@@ -125,16 +153,28 @@ func _check_combat_threshold():
 			break
 
 # ---- 玩家受伤 ----
+signal player_damaged(amount: int)
+
 func take_damage(amount: int):
 	var real_amount = int(amount * BossGrid.boss_attack_multiplier)
+	if real_amount <= 0:
+		return
 	player_hp = max(0, player_hp - real_amount)
+	player_damaged.emit(real_amount)
 	if player_hp <= 0:
 		game_over.emit()
 
 # ---- 进入下一层 ----
 func next_floor():
 	floor_number += 1
+	stat_floors_cleared += 1
 	triggered_thresholds.clear()
+	bomb_streak = 0
+	total_bombs_found = 0
+	intel_points = 0
+	reroll_tokens = 0
+	bomb_cooldowns.clear()
+	_roll_challenge_modifier()
 	# bomb_inventory 保留，炸弹可以带入下一关
 	max_clicks = LevelData.get_max_clicks(floor_number)
 	current_clicks = max_clicks  # 重置点击数，防止跨关残留
@@ -146,10 +186,67 @@ func next_floor():
 func init_boss_hp():
 	boss_max_hp = BossGrid.get_total_max_hp()
 	boss_hp = BossGrid.get_total_hp()
+	BossGrid.update_phase_by_hp(boss_hp, boss_max_hp)
 
 # ---- 玩家回血（升级用）----
 func heal(amount: int):
 	player_hp = min(player_hp + amount, player_max_hp)
+
+func add_intel(amount: int):
+	if amount <= 0:
+		return
+	intel_points = max(0, intel_points + amount)
+	intel_changed.emit(intel_points)
+
+func add_reroll_token(amount: int = 1):
+	reroll_tokens = max(0, reroll_tokens + amount)
+
+func use_reroll_token() -> bool:
+	if reroll_tokens <= 0:
+		return false
+	reroll_tokens -= 1
+	return true
+
+func use_intel(amount: int = 1) -> bool:
+	if amount <= 0:
+		return true
+	if intel_points < amount:
+		return false
+	intel_points -= amount
+	intel_changed.emit(intel_points)
+	return true
+
+func apply_bomb_cooldown(type: String, turns: int):
+	if turns <= 0:
+		return
+	bomb_cooldowns[type] = max(bomb_cooldowns.get(type, 0), turns)
+
+func _tick_bomb_cooldowns():
+	for type in bomb_cooldowns.keys():
+		bomb_cooldowns[type] -= 1
+		if bomb_cooldowns[type] <= 0:
+			bomb_cooldowns.erase(type)
+	bomb_inventory_changed.emit()
+
+func _roll_challenge_modifier():
+	var weighted: Array = [
+		"连锁强化：连锁加成+20%，点击-1",
+		"护盾风暴：Boss护盾格+1",
+		"情报富集：每回合+1情报"
+	]
+	# 冷却回路放到中后期更有意义，避免前期出现体感落差
+	if floor_number >= 5:
+		weighted.append("冷却回路：过载效果伤害+20%")
+	if floor_number >= 12:
+		weighted.append("冷却回路：过载效果伤害+20%")
+	if floor_number >= 20:
+		weighted.append("护盾风暴：Boss护盾格+1")
+
+	var picked = weighted[randi() % weighted.size()]
+	if weighted.size() > 1 and picked == _last_challenge_modifier:
+		picked = weighted[randi() % weighted.size()]
+	challenge_modifier = picked
+	_last_challenge_modifier = challenge_modifier
 
 # ---- 横扫减益：下回合点击次数-2 ----
 var _swipe_debuff: int = 0
@@ -158,8 +255,21 @@ func apply_swipe_debuff():
 	_swipe_debuff += 2
 
 func start_turn():
+	if challenge_modifier.is_empty():
+		_roll_challenge_modifier()
+	# 冷却应在每回合开始时递减，而非仅初始化时生效
+	_tick_bomb_cooldowns()
 	current_clicks = max(1, max_clicks - _swipe_debuff)
 	_swipe_debuff = 0
-	turn_timer = turn_duration
+	if challenge_modifier == "连锁强化：连锁加成+20%，点击-1":
+		current_clicks = max(1, current_clicks - 1)
+	if challenge_modifier == "情报富集：每回合+1情报":
+		add_intel(1)
+	BossGrid.on_new_turn()
+	# Boss到达伤害位置时大幅缩短回合时间（紧迫感）
+	if BossGrid.has_alive_at_left_edge():
+		turn_timer = max(8.0, turn_duration * 0.4)
+	else:
+		turn_timer = turn_duration
 	timer_running = true
 	turn_started.emit()

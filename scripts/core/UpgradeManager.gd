@@ -8,8 +8,14 @@ const PERMANENT_UPGRADES = [
 	{ "id": "bomb_range_up",  "name": "范围扩展", "description": "所有炸弹攻击范围 +1",   "rarity": "rare"   },
 	{ "id": "bomb_dmg_up",    "name": "火药加强", "description": "所有炸弹基础伤害 +3",   "rarity": "common" },
 	{ "id": "unlock_cross",   "name": "十字炮",   "description": "解锁十字炮炸弹",          "rarity": "rare"   },
+	{ "id": "unlock_fan",     "name": "扇形弹",   "description": "解锁扇形弹",              "rarity": "rare"   },
 	{ "id": "unlock_x_shot",  "name": "X发射",    "description": "解锁X发射炸弹",            "rarity": "rare"   },
+	{ "id": "unlock_second",  "name": "二次弹",   "description": "解锁二次引爆弹",          "rarity": "epic"   },
+	{ "id": "unlock_freeze",  "name": "冰封弹",   "description": "解锁冰封弹",              "rarity": "epic"   },
+	{ "id": "unlock_magnetic", "name": "磁暴弹",  "description": "解锁磁暴弹",             "rarity": "epic"   },
 	{ "id": "unlock_bounce",  "name": "反弹炸弹", "description": "解锁反弹炸弹",            "rarity": "epic"   },
+	{ "id": "unlock_blackhole", "name": "黑洞弹", "description": "解锁黑洞弹",              "rarity": "epic"   },
+	{ "id": "unlock_ultimate", "name": "究极弹",  "description": "解锁局内唯一究极弹",      "rarity": "epic"   },
 	{ "id": "chain_boost",    "name": "连锁大师", "description": "连锁加成从30%提升到60%","rarity": "epic"   },
 ]
 
@@ -48,14 +54,25 @@ func apply_permanent(upgrade: Dictionary):
 		"bomb_range_up":
 			BombRegistry.upgrade_all_bomb_levels()
 		"bomb_dmg_up":
-			for key in BombRegistry.BOMB_TYPES:
-				BombRegistry.BOMB_TYPES[key]["damage"] += 3
+			BombRegistry.bonus_damage += 3
 		"unlock_cross":
 			BombRegistry.unlock_type("cross")
+		"unlock_fan":
+			BombRegistry.unlock_type("fan")
 		"unlock_x_shot":
 			BombRegistry.unlock_type("x_shot")
+		"unlock_second":
+			BombRegistry.unlock_type("second_blast")
+		"unlock_freeze":
+			BombRegistry.unlock_type("freeze_bomb")
+		"unlock_magnetic":
+			BombRegistry.unlock_type("magnetic")
 		"unlock_bounce":
 			BombRegistry.unlock_type("bounce")
+		"unlock_blackhole":
+			BombRegistry.unlock_type("blackhole")
+		"unlock_ultimate":
+			BombRegistry.unlock_type("ultimate")
 		"chain_boost":
 			_chain_multiplier_perm = 0.6
 
@@ -65,8 +82,8 @@ func apply_combat(upgrade: Dictionary):
 			active_combat["reveal_bombs"] = true
 			reveal_bombs_triggered.emit()
 		"reveal_area":
-			var cx = randi_range(2, GridManager.cols - 3)
-			var cy = randi_range(2, GridManager.rows - 3)
+			var cx = randi_range(2, max(2, GridManager.cols - 3))
+			var cy = randi_range(2, max(2, GridManager.rows - 3))
 			GridManager.reveal_area(cx, cy, 2)
 		"extra_weak":
 			BossGrid.refresh_weak_tiles()
