@@ -6,17 +6,17 @@ extends Node
 
 signal theme_changed(new_theme: String)
 
-enum Theme { DUNGEON, CYBER, PIXEL }
+enum ThemeStyle { DUNGEON, CYBER, PIXEL }
 
 const THEME_NAMES = {
-	Theme.DUNGEON: "暗黑地牢",
-	Theme.CYBER:   "赛博朋克",
-	Theme.PIXEL:   "像素复古",
+	ThemeStyle.DUNGEON: "暗黑地牢",
+	ThemeStyle.CYBER:   "赛博朋克",
+	ThemeStyle.PIXEL:   "像素复古",
 }
 
 const SAVE_PATH = "user://ui_theme.cfg"
 
-var current_theme: int = Theme.DUNGEON
+var current_theme: int = ThemeStyle.DUNGEON
 
 # ── 每套主题的色板 ─────────────────────────────────────────────
 #
@@ -56,7 +56,7 @@ var current_theme: int = Theme.DUNGEON
 #   dmg_lo / dmg_mid / dmg_hi  三档伤害数字
 
 const PALETTES = {
-	Theme.DUNGEON: {
+	ThemeStyle.DUNGEON: {
 		"bg_empty":        Color(0.18, 0.17, 0.20),
 		"bg_secondary":    Color(0.25, 0.26, 0.30),
 		"bg_void":         Color(0.06, 0.06, 0.07),
@@ -103,7 +103,7 @@ const PALETTES = {
 		"corner_radius":   4,
 		"border_width":    2,
 	},
-	Theme.CYBER: {
+	ThemeStyle.CYBER: {
 		"bg_empty":        Color(0.04, 0.06, 0.12),
 		"bg_secondary":    Color(0.06, 0.04, 0.14),
 		"bg_void":         Color(0.02, 0.02, 0.05),
@@ -150,7 +150,7 @@ const PALETTES = {
 		"corner_radius":   1,
 		"border_width":    2,
 	},
-	Theme.PIXEL: {
+	ThemeStyle.PIXEL: {
 		"bg_empty":        Color(0.12, 0.14, 0.10),
 		"bg_secondary":    Color(0.22, 0.24, 0.18),
 		"bg_void":         Color(0.05, 0.06, 0.04),
@@ -202,17 +202,17 @@ const PALETTES = {
 # ── 数字颜色（扫雷1-8）也按主题分套 ───────────────────────────
 
 const NUMBER_COLORS_BY_THEME = {
-	Theme.DUNGEON: [
+	ThemeStyle.DUNGEON: [
 		Color(0,0,0), Color(0.15,0.35,0.80), Color(0.12,0.55,0.22),
 		Color(0.80,0.15,0.12), Color(0.22,0.15,0.62), Color(0.62,0.12,0.12),
 		Color(0.12,0.50,0.55), Color(0.88,0.72,0.18), Color(0.55,0.38,0.18),
 	],
-	Theme.CYBER: [
+	ThemeStyle.CYBER: [
 		Color(0,0,0), Color(0.0,0.85,0.95), Color(0.0,0.95,0.5),
 		Color(0.95,0.05,0.45), Color(0.6,0.2,1.0), Color(0.95,0.3,0.65),
 		Color(0.0,0.7,0.9), Color(0.95,0.85,0.0), Color(0.8,0.5,0.0),
 	],
-	Theme.PIXEL: [
+	ThemeStyle.PIXEL: [
 		Color(0,0,0), Color(0.25,0.50,0.95), Color(0.18,0.72,0.25),
 		Color(0.92,0.18,0.10), Color(0.55,0.18,0.85), Color(0.80,0.14,0.14),
 		Color(0.15,0.65,0.70), Color(0.95,0.78,0.10), Color(0.65,0.40,0.14),
@@ -259,4 +259,4 @@ func _save():
 func _load():
 	var cfg = ConfigFile.new()
 	if cfg.load(SAVE_PATH) == OK:
-		current_theme = cfg.get_value("ui", "theme", Theme.DUNGEON)
+		current_theme = cfg.get_value("ui", "theme", ThemeStyle.DUNGEON)

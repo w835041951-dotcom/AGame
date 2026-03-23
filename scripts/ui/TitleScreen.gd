@@ -127,7 +127,7 @@ func _setup_scene():
 
 const THEME_DEFS = [
 	{
-		"id": UIThemeManager.Theme.DUNGEON,
+		"id": UIThemeManager.ThemeStyle.DUNGEON,
 		"name": "暗黑地牢",
 		"desc": "古老石窟\n炙热熔金",
 		"accent": Color(0.95, 0.75, 0.20),
@@ -135,7 +135,7 @@ const THEME_DEFS = [
 		"brd":    Color(0.55, 0.40, 0.15),
 	},
 	{
-		"id": UIThemeManager.Theme.CYBER,
+		"id": UIThemeManager.ThemeStyle.CYBER,
 		"name": "赛博朋克",
 		"desc": "霓虹数据\n电磁脉冲",
 		"accent": Color(0.0,  0.95, 0.85),
@@ -143,7 +143,7 @@ const THEME_DEFS = [
 		"brd":    Color(0.0,  0.75, 0.90),
 	},
 	{
-		"id": UIThemeManager.Theme.PIXEL,
+		"id": UIThemeManager.ThemeStyle.PIXEL,
 		"name": "像素复古",
 		"desc": "8-bit像素\n复古光荣",
 		"accent": Color(0.95, 0.88, 0.25),
