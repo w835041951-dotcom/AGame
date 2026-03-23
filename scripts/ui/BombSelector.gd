@@ -20,23 +20,23 @@ func _ready():
 
 func _apply_theme():
 	var tm = UIThemeManager
-	inventory_label.add_theme_color_override("font_color", tm.get("text_secondary"))
-	end_turn_btn.add_theme_color_override("font_color", tm.get("btn_end_text"))
-	var cr = tm.get("corner_radius") as int
+	inventory_label.add_theme_color_override("font_color", tm.color("text_secondary"))
+	end_turn_btn.add_theme_color_override("font_color", tm.color("btn_end_text"))
+	var cr = tm.color("corner_radius") as int
 	var s = StyleBoxFlat.new()
-	s.bg_color = tm.get("btn_end_bg")
-	s.border_color = tm.get("btn_end_brd")
+	s.bg_color = tm.color("btn_end_bg")
+	s.border_color = tm.color("btn_end_brd")
 	s.set_border_width_all(2)
 	s.set_corner_radius_all(cr)
 	s.shadow_color = Color(0, 0, 0, 0.4)
 	s.shadow_size = 2
 	end_turn_btn.add_theme_stylebox_override("normal", s)
 	var h = s.duplicate()
-	h.bg_color = tm.get("btn_end_hover")
-	h.border_color = tm.get("btn_end_hbrd")
+	h.bg_color = tm.color("btn_end_hover")
+	h.border_color = tm.color("btn_end_hbrd")
 	end_turn_btn.add_theme_stylebox_override("hover", h)
 	var p = s.duplicate()
-	p.bg_color = (tm.get("btn_end_bg") as Color).darkened(0.25)
+	p.bg_color = (tm.color("btn_end_bg") as Color).darkened(0.25)
 	end_turn_btn.add_theme_stylebox_override("pressed", p)
 
 func _rebuild(_n = null):
@@ -70,17 +70,17 @@ func _make_type_btn(type_id: String) -> Button:
 	btn.button_pressed = (type_id == BombPlacer.selected_type)
 	var col = info.get("color", Color.WHITE)
 	btn.add_theme_color_override("font_color", col.lightened(0.2))
-	var cr = tm.get("corner_radius") as int
+	var cr = tm.color("corner_radius") as int
 	var s = StyleBoxFlat.new()
-	s.bg_color = tm.get("btn_normal_bg")
-	s.border_color = tm.get("btn_normal_brd")
+	s.bg_color = tm.color("btn_normal_bg")
+	s.border_color = tm.color("btn_normal_brd")
 	s.set_border_width_all(2)
 	s.set_corner_radius_all(cr)
 	s.shadow_color = Color(0, 0, 0, 0.3)
 	s.shadow_size = 1
 	btn.add_theme_stylebox_override("normal", s)
 	var hv = s.duplicate()
-	hv.bg_color = tm.get("btn_hover_bg")
+	hv.bg_color = tm.color("btn_hover_bg")
 	hv.border_color = col.darkened(0.3)
 	btn.add_theme_stylebox_override("hover", hv)
 	var sel = s.duplicate()

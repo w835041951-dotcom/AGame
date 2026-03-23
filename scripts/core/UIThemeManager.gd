@@ -224,7 +224,7 @@ const NUMBER_COLORS_BY_THEME = {
 func _ready():
 	_load()
 
-func get(key: String) -> Variant:
+func color(key: String) -> Variant:
 	return PALETTES[current_theme][key]
 
 func get_number_color(n: int) -> Color:
@@ -241,10 +241,10 @@ func theme_name() -> String:
 
 func make_stylebox(key_bg: String, key_brd: String, border_w: int = -1, corner_r: int = -1) -> StyleBoxFlat:
 	var s = StyleBoxFlat.new()
-	s.bg_color = get(key_bg)
-	s.border_color = get(key_brd)
-	var bw = border_w if border_w >= 0 else get("border_width")
-	var cr = corner_r if corner_r >= 0 else get("corner_radius")
+	s.bg_color = color(key_bg)
+	s.border_color = color(key_brd)
+	var bw = border_w if border_w >= 0 else color("border_width")
+	var cr = corner_r if corner_r >= 0 else color("corner_radius")
 	s.set_border_width_all(bw)
 	s.set_corner_radius_all(cr)
 	return s

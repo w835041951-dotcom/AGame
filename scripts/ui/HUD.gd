@@ -20,37 +20,37 @@ func _ready():
 func _apply_theme():
 	var tm = UIThemeManager
 	floor_label.add_theme_font_size_override("font_size", 20)
-	floor_label.add_theme_color_override("font_color", tm.get("text_accent"))
+	floor_label.add_theme_color_override("font_color", tm.color("text_accent"))
 	floor_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	floor_label.add_theme_constant_override("shadow_offset_x", 1)
 	floor_label.add_theme_constant_override("shadow_offset_y", 1)
 	timer_label.add_theme_font_size_override("font_size", 24)
-	timer_label.add_theme_color_override("font_color", tm.get("text_primary"))
+	timer_label.add_theme_color_override("font_color", tm.color("text_primary"))
 	timer_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	timer_label.add_theme_constant_override("shadow_offset_x", 1)
 	timer_label.add_theme_constant_override("shadow_offset_y", 1)
 	clicks_label.add_theme_font_size_override("font_size", 17)
-	clicks_label.add_theme_color_override("font_color", tm.get("text_secondary"))
+	clicks_label.add_theme_color_override("font_color", tm.color("text_secondary"))
 	player_hp_label.add_theme_font_size_override("font_size", 19)
-	player_hp_label.add_theme_color_override("font_color", tm.get("player_hp_text"))
+	player_hp_label.add_theme_color_override("font_color", tm.color("player_hp_text"))
 	player_hp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	player_hp_label.add_theme_constant_override("shadow_offset_x", 1)
 	player_hp_label.add_theme_constant_override("shadow_offset_y", 1)
 	boss_hp_label.add_theme_font_size_override("font_size", 16)
-	boss_hp_label.add_theme_color_override("font_color", tm.get("boss_hp_text"))
+	boss_hp_label.add_theme_color_override("font_color", tm.color("boss_hp_text"))
 	_style_boss_bar()
 
 func _style_boss_bar():
 	var tm = UIThemeManager
 	var bg = StyleBoxFlat.new()
-	bg.bg_color = tm.get("boss_bar_bg")
-	bg.border_color = tm.get("boss_bar_brd")
+	bg.bg_color = tm.color("boss_bar_bg")
+	bg.border_color = tm.color("boss_bar_brd")
 	bg.set_border_width_all(2)
-	bg.set_corner_radius_all(tm.get("corner_radius"))
+	bg.set_corner_radius_all(tm.color("corner_radius"))
 	boss_hp_bar.add_theme_stylebox_override("background", bg)
 	var fill = StyleBoxFlat.new()
-	fill.bg_color = tm.get("boss_bar_fill")
-	fill.set_corner_radius_all(tm.get("corner_radius"))
+	fill.bg_color = tm.color("boss_bar_fill")
+	fill.set_corner_radius_all(tm.color("corner_radius"))
 	boss_hp_bar.add_theme_stylebox_override("fill", fill)
 
 func _process(delta):
@@ -71,7 +71,7 @@ func _process(delta):
 	timer_label.text = "⏱ %.0f" % t
 	var warn = t < 10.0 and GameManager.timer_running
 	timer_label.add_theme_color_override("font_color",
-		UIThemeManager.get("text_danger") if warn else UIThemeManager.get("text_primary"))
+		UIThemeManager.color("text_danger") if warn else UIThemeManager.color("text_primary"))
 
 	var t_int = int(t)
 	if warn and t_int != _last_timer_int:

@@ -52,7 +52,7 @@ func _update_mark_display():
 	if _marked_safe:
 		text = "○"
 		add_theme_font_size_override("font_size", 24)
-		add_theme_color_override("font_color", UIThemeManager.get("text_heal"))
+		add_theme_color_override("font_color", UIThemeManager.color("text_heal"))
 	else:
 		text = ""
 		remove_theme_color_override("font_color")
@@ -77,7 +77,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 
 	match state:
 		DisplayState.EMPTY:
-			_apply_style(tm.get("bg_empty"), tm.get("border_default"), 1)
+			_apply_style(tm.color("bg_empty"), tm.color("border_default"), 1)
 
 		DisplayState.BOMB_PLACED:
 			var bomb_type = extra.get("bomb_type", "pierce_h")
@@ -91,21 +91,21 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), lvl, range_desc]
 
 		DisplayState.BLOCKED:
-			_apply_style(Color(0.22, 0.05, 0.05), tm.get("text_danger").darkened(0.35), 2)
+			_apply_style(Color(0.22, 0.05, 0.05), tm.color("text_danger").darkened(0.35), 2)
 			text = "✕"
-			add_theme_color_override("font_color", tm.get("text_danger"))
+			add_theme_color_override("font_color", tm.color("text_danger"))
 			disabled = true
 
 		DisplayState.BOSS_NORMAL, DisplayState.BOSS_WEAK, DisplayState.BOSS_ARMOR, DisplayState.BOSS_ABSORB:
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			var border_col = tm.get("text_danger").darkened(0.2)
+			var border_col = tm.color("text_danger").darkened(0.2)
 			var border_w = 1
 			match state:
-				DisplayState.BOSS_WEAK:   border_col = tm.get("boss_weak_brd");   border_w = 3
-				DisplayState.BOSS_ARMOR:  border_col = tm.get("boss_armor_brd");  border_w = 3
-				DisplayState.BOSS_ABSORB: border_col = tm.get("boss_absorb_brd"); border_w = 2
+				DisplayState.BOSS_WEAK:   border_col = tm.color("boss_weak_brd");   border_w = 3
+				DisplayState.BOSS_ARMOR:  border_col = tm.color("boss_armor_brd");  border_w = 3
+				DisplayState.BOSS_ABSORB: border_col = tm.color("boss_absorb_brd"); border_w = 2
 			_apply_style(Color(0,0,0,0), border_col, border_w)
 			_show_boss_info(extra)
 			var hp = extra.get("hp", -1)
@@ -117,20 +117,20 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			var local = extra.get("local_pos", Vector2i(0, 0))
 			icon = _get_boss_cell_texture(local)
 			expand_icon = true
-			_apply_style(tm.get("bg_void"), tm.get("bg_secondary"), 1)
+			_apply_style(tm.color("bg_void"), tm.color("bg_secondary"), 1)
 			modulate = Color(0.35, 0.3, 0.3, 0.5)
 			_hp_ratio = -1.0
 			queue_redraw()
 
 		DisplayState.EXPLODING:
-			_apply_style(tm.get("explode_bg"), tm.get("explode_brd"), 3)
+			_apply_style(tm.color("explode_bg"), tm.color("explode_brd"), 3)
 			_flash_explode()
 
 		DisplayState.MINE_HIDDEN:
-			_apply_style(tm.get("mine_hidden"), tm.get("mine_hidden_brd"), 2)
+			_apply_style(tm.color("mine_hidden"), tm.color("mine_hidden_brd"), 2)
 
 		DisplayState.MINE_REVEALED:
-			_apply_style(tm.get("mine_reveal"), tm.get("mine_reveal_brd"), 1)
+			_apply_style(tm.color("mine_reveal"), tm.color("mine_reveal_brd"), 1)
 			disabled = true
 			var adj = extra.get("adjacent", 0)
 			if adj > 0:
@@ -187,11 +187,11 @@ func _draw():
 	draw_rect(Rect2(1, bar_y, cell_size - 2, bar_h), Color(0.05, 0.05, 0.05, 0.85))
 	var bar_col: Color
 	if _hp_ratio > 0.6:
-		bar_col = UIThemeManager.get("text_heal")
+		bar_col = UIThemeManager.color("text_heal")
 	elif _hp_ratio > 0.3:
 		bar_col = Color(0.95, 0.75, 0.1)
 	else:
-		bar_col = UIThemeManager.get("text_danger")
+		bar_col = UIThemeManager.color("text_danger")
 	var fill_w = int((cell_size - 2) * _hp_ratio)
 	if fill_w > 0:
 		draw_rect(Rect2(1, bar_y, fill_w, bar_h), bar_col)
@@ -235,7 +235,7 @@ func _show_boss_info(extra: Dictionary):
 		BossGrid.BodyPart.LEG:  text = "L"
 		BossGrid.BodyPart.CORE: text = "C"
 	if text != "":
-		add_theme_color_override("font_color", UIThemeManager.get("text_accent"))
+		add_theme_color_override("font_color", UIThemeManager.color("text_accent"))
 
 func _bomb_symbol(bomb_type: String) -> String:
 	match bomb_type:
@@ -247,8 +247,8 @@ func _bomb_symbol(bomb_type: String) -> String:
 		_:           return "!"
 
 func _flash_explode():
-	var c_start = UIThemeManager.get("explode_bg")
-	var c_end   = UIThemeManager.get("bg_empty")
+	var c_start = UIThemeManager.color("explode_bg")
+	var c_end   = UIThemeManager.color("bg_empty")
 	var tween = create_tween()
 	tween.tween_method(func(c): _apply_style(c, Color.YELLOW, 3), c_start, c_end, 0.5)
 
@@ -295,13 +295,13 @@ func animate_magic_reveal():
 	tw2.tween_property(self, "modulate", Color.WHITE, 0.3)
 
 func animate_boss_pulse():
-	var c = UIThemeManager.get("boss_pulse")
+	var c = UIThemeManager.color("boss_pulse")
 	var tween = create_tween()
 	tween.tween_property(self, "modulate", c, 0.05)
 	tween.tween_property(self, "modulate", Color.WHITE, 0.25)
 
 func animate_chain():
-	var c = UIThemeManager.get("chain_flash")
+	var c = UIThemeManager.color("chain_flash")
 	pivot_offset = size / 2
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(self, "modulate", c, 0.08)
@@ -312,7 +312,7 @@ func animate_chain():
 	tw2.tween_property(self, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _apply_style(bg: Color, border: Color, border_w: int):
-	var cr = UIThemeManager.get("corner_radius") as int
+	var cr = UIThemeManager.color("corner_radius") as int
 	var s = StyleBoxFlat.new()
 	s.bg_color = bg
 	s.set_border_width_all(border_w)

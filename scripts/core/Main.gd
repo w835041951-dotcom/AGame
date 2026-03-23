@@ -210,7 +210,7 @@ func _show_level_intro():
 
 	# 暗背景
 	var bg = ColorRect.new()
-	bg.color = UIThemeManager.get("intro_overlay")
+	bg.color = UIThemeManager.color("intro_overlay")
 	bg.size = Vector2(1920, 1080)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	canvas.add_child(bg)
@@ -222,7 +222,7 @@ func _show_level_intro():
 	whisper.position = Vector2(0, 300)
 	whisper.size = Vector2(1920, 40)
 	whisper.add_theme_font_size_override("font_size", 18)
-	whisper.add_theme_color_override("font_color", UIThemeManager.get("whisper_text"))
+	whisper.add_theme_color_override("font_color", UIThemeManager.color("whisper_text"))
 	whisper.modulate = Color(1, 1, 1, 0)
 	bg.add_child(whisper)
 
@@ -233,7 +233,7 @@ func _show_level_intro():
 	floor_label.position = Vector2(0, 340)
 	floor_label.size = Vector2(1920, 50)
 	floor_label.add_theme_font_size_override("font_size", 32)
-	floor_label.add_theme_color_override("font_color", UIThemeManager.get("floor_text"))
+	floor_label.add_theme_color_override("font_color", UIThemeManager.color("floor_text"))
 	floor_label.modulate = Color(1, 1, 1, 0)
 	bg.add_child(floor_label)
 
@@ -259,7 +259,7 @@ func _show_level_intro():
 	boss_label.position = Vector2(0, 490)
 	boss_label.size = Vector2(1920, 50)
 	boss_label.add_theme_font_size_override("font_size", 34)
-	boss_label.add_theme_color_override("font_color", UIThemeManager.get("boss_label"))
+	boss_label.add_theme_color_override("font_color", UIThemeManager.color("boss_label"))
 	boss_label.modulate = Color(1, 1, 1, 0)
 	bg.add_child(boss_label)
 
@@ -270,7 +270,7 @@ func _show_level_intro():
 	sub.position = Vector2(0, 550)
 	sub.size = Vector2(1920, 50)
 	sub.add_theme_font_size_override("font_size", 26)
-	sub.add_theme_color_override("font_color", UIThemeManager.get("text_secondary"))
+	sub.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
 	sub.modulate = Color(1, 1, 1, 0)
 	bg.add_child(sub)
 
@@ -417,7 +417,7 @@ func _show_mark_heal_animation(count: int):
 		var lbl = Label.new()
 		lbl.text = "+1 HP"
 		lbl.add_theme_font_size_override("font_size", 36)
-		lbl.add_theme_color_override("font_color", UIThemeManager.get("text_heal"))
+		lbl.add_theme_color_override("font_color", UIThemeManager.color("text_heal"))
 		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		lbl.add_theme_constant_override("shadow_offset_x", 2)
 		lbl.add_theme_constant_override("shadow_offset_y", 2)
@@ -450,7 +450,7 @@ func _on_damage_numbers(cell_damages: Dictionary):
 		lbl.text = "-%d" % dmg
 		var font_size = 28 if dmg < 30 else (38 if dmg < 60 else 50)
 		lbl.add_theme_font_size_override("font_size", font_size)
-		var col = UIThemeManager.get("dmg_lo") if dmg < 20 else (UIThemeManager.get("dmg_mid") if dmg < 50 else UIThemeManager.get("dmg_hi"))
+		var col = UIThemeManager.color("dmg_lo") if dmg < 20 else (UIThemeManager.color("dmg_mid") if dmg < 50 else UIThemeManager.color("dmg_hi"))
 		lbl.add_theme_color_override("font_color", col)
 		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		lbl.add_theme_constant_override("shadow_offset_x", 2)
@@ -502,8 +502,8 @@ func _show_game_over_screen():
 	title.position = Vector2(0, 260)
 	title.size = Vector2(1920, 120)
 	title.add_theme_font_size_override("font_size", 96)
-	title.add_theme_color_override("font_color", UIThemeManager.get("text_danger"))
-	title.add_theme_color_override("font_shadow_color", (UIThemeManager.get("text_danger") as Color).darkened(0.6))
+	title.add_theme_color_override("font_color", UIThemeManager.color("text_danger"))
+	title.add_theme_color_override("font_shadow_color", (UIThemeManager.color("text_danger") as Color).darkened(0.6))
 	title.add_theme_constant_override("shadow_offset_x", 4)
 	title.add_theme_constant_override("shadow_offset_y", 4)
 	title.modulate = Color(1, 1, 1, 0)
@@ -516,7 +516,7 @@ func _show_game_over_screen():
 	sep.position = Vector2(0, 450)
 	sep.size = Vector2(1920, 40)
 	sep.add_theme_font_size_override("font_size", 24)
-	sep.add_theme_color_override("font_color", (UIThemeManager.get("text_danger") as Color).darkened(0.3).lerp(Color.TRANSPARENT, 0.4))
+	sep.add_theme_color_override("font_color", (UIThemeManager.color("text_danger") as Color).darkened(0.3).lerp(Color.TRANSPARENT, 0.4))
 	sep.modulate = Color(1, 1, 1, 0)
 	overlay.add_child(sep)
 
@@ -528,7 +528,7 @@ func _show_game_over_screen():
 	info.position = Vector2(0, 540)
 	info.size = Vector2(1920, 60)
 	info.add_theme_font_size_override("font_size", 42)
-	info.add_theme_color_override("font_color", UIThemeManager.get("text_accent"))
+	info.add_theme_color_override("font_color", UIThemeManager.color("text_accent"))
 	info.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	info.add_theme_constant_override("shadow_offset_x", 2)
 	info.add_theme_constant_override("shadow_offset_y", 2)
@@ -543,14 +543,14 @@ func _show_game_over_screen():
 	hint.position = Vector2(0, 620)
 	hint.size = Vector2(1920, 50)
 	hint.add_theme_font_size_override("font_size", 28)
-	hint.add_theme_color_override("font_color", UIThemeManager.get("text_secondary"))
+	hint.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
 	hint.modulate = Color(1, 1, 1, 0)
 	overlay.add_child(hint)
 
 	# ═══ 动画序列 ═══
 	# 1. 遮罩渐暗
 	var tw_bg = create_tween()
-	tw_bg.tween_property(overlay, "color", UIThemeManager.get("intro_overlay"), 1.2)
+	tw_bg.tween_property(overlay, "color", UIThemeManager.color("intro_overlay"), 1.2)
 
 	# 2. 标题从上方滑入（带回弹）
 	var tw_t1 = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
