@@ -62,8 +62,8 @@ func _refresh(_n = null):
 			var cd = GameManager.bomb_cooldowns.get(type_id, 0)
 			var info = BombRegistry.get_bomb_info(type_id)
 			var lvl = BombRegistry.get_bomb_level(type_id)
-			var cd_text = "" if cd <= 0 else " 冷却:%d" % cd
-			btn.text = "%s %s Lv.%d\n[%d]%s" % [_bomb_icon(type_id), info.get("name",""), lvl, count, cd_text]
+			var cd_text = "" if cd <= 0 else "\n冷却:%d" % cd
+			btn.text = "%s Lv%d ×%d%s" % [info.get("name",""), lvl, count, cd_text]
 			var aff = BombRegistry.get_affixes(type_id)
 			var aff_text = "无" if aff.is_empty() else ",".join(aff)
 			btn.tooltip_text = "%s  Lv.%d\n范围: %s\n词条: %s" % [info.get("name",""), lvl, BombRegistry.get_range_description(type_id), aff_text]
@@ -75,10 +75,14 @@ func _make_type_btn(type_id: String) -> Button:
 	var info = BombRegistry.get_bomb_info(type_id)
 	var btn = Button.new()
 	btn.set_meta("type_id", type_id)
-	btn.custom_minimum_size = Vector2(130, 60)
-	btn.add_theme_font_size_override("font_size", 13)
+	btn.custom_minimum_size = Vector2(160, 72)
+	btn.add_theme_font_size_override("font_size", 14)
 	btn.toggle_mode = true
 	btn.button_pressed = (type_id == BombPlacer.selected_type)
+	btn.expand_icon = true
+	btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.add_theme_constant_override("icon_max_width", 36)
 	var col = info.get("color", Color.WHITE)
 	btn.add_theme_color_override("font_color", col.lightened(0.3))
 	btn.add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))

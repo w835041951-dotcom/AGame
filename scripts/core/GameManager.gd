@@ -168,6 +168,8 @@ func take_damage(amount: int):
 func next_floor():
 	floor_number += 1
 	stat_floors_cleared += 1
+	# 每层通关固定回血 3 点
+	player_hp = min(player_hp + 3, player_max_hp)
 	triggered_thresholds.clear()
 	bomb_streak = 0
 	total_bombs_found = 0
@@ -259,6 +261,9 @@ func start_turn():
 		_roll_challenge_modifier()
 	# 冷却应在每回合开始时递减，而非仅初始化时生效
 	_tick_bomb_cooldowns()
+	# 防止出现“没有炸弹且无法造成伤害”的纯随机卡死局
+	if total_bombs() <= 0 and BombPlacer.placed_bombs.is_empty():
+		add_bomb("pierce_h")
 	current_clicks = max(1, max_clicks - _swipe_debuff)
 	_swipe_debuff = 0
 	if challenge_modifier == "连锁强化：连锁加成+20%，点击-1":

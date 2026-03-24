@@ -114,7 +114,7 @@ func _celebrate_bomb_found(x: int, y: int):
 	# 脉冲放大 + 金色闪光
 	cell_node.pivot_offset = cell_node.size / 2
 	var tw = create_tween()
-	tw.tween_property(cell_node, "modulate", UIThemeManager.color("text_accent").lightened(0.8), 0.08)
+	tw.tween_property(cell_node, "modulate", (UIThemeManager.color("text_accent") as Color).lightened(0.8), 0.08)
 	tw.tween_property(cell_node, "scale", Vector2(1.3, 1.3), 0.08).set_trans(Tween.TRANS_BACK)
 	tw.set_parallel(false)
 	tw.tween_property(cell_node, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

@@ -55,5 +55,12 @@ func _ready():
 	GameManager.lucky_find.connect(func(_type, _text): AudioManager.play_sfx("mine_bomb"))
 	GameManager.streak_bonus.connect(func(_streak, _text): AudioManager.play_sfx("chain"))
 
+	# 小怪击杀
+	MinionGrid.minion_defeated.connect(func(_pos, _drop): AudioManager.play_sfx("tile_break"))
+	MinionGrid.all_minions_cleared.connect(func(): AudioManager.play_sfx("upgrade_pick"))
+
+	# 探索点击耗尽
+	GameManager.clicks_exhausted.connect(func(): AudioManager.play_sfx("timer_warn"))
+
 	# 倒计时警告音（每秒一次，当剩余<10s）
 	# 由 HUD 的 _process 触发，见 HUD.gd

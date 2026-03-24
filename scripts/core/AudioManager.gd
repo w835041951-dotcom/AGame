@@ -51,6 +51,7 @@ func _ready():
 	sfx_player.bus = "SFX"
 	_set_bus_volume("Music", music_volume)
 	_set_bus_volume("SFX", sfx_volume)
+	bgm_player.finished.connect(_on_bgm_finished)
 
 func _ensure_bus(bus_name: String):
 	if AudioServer.get_bus_index(bus_name) == -1:
@@ -69,6 +70,11 @@ func play_bgm(track_name: String, crossfade: bool = true):
 	if path == "" or not ResourceLoader.exists(path):
 		return
 	var stream = load(path)
+	# 确保BGM循环播放
+	if stream is AudioStreamWAV:
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	elif stream is AudioStreamOggVorbis:
+		stream.loop = true
 	if crossfade and bgm_player.playing:
 		await _fade_out(bgm_player, 0.5)
 	bgm_player.stream = stream
@@ -82,7 +88,14 @@ func stop_bgm(fade: bool = true):
 	bgm_player.stop()
 	_current_bgm = ""
 
+func _on_bgm_finished():
+	# 如果BGM意外结束（流未循环），自动重播
+	if _current_bgm != "" and bgm_player.stream:
+		bgm_player.play()
+
 # ---- 音效 ----
+
+const MAX_SFX_POLYPHONY: int = 6  # 最多同时播放音效数
 
 func play_sfx(sfx_name: String):
 	var path = SFX_FILES.get(sfx_name, "")
@@ -90,7 +103,18 @@ func play_sfx(sfx_name: String):
 		return
 	if sfx_name not in _sfx_cache:
 		_sfx_cache[sfx_name] = load(path)
-	# 音效用独立 Player 以支持同时播放
+	# 限制同时播放的音效数量，防止爆音/杂音
+	var active_sfx := 0
+	var oldest: AudioStreamPlayer = null
+	for child in get_children():
+		if child is AudioStreamPlayer and child != bgm_player and child != sfx_player:
+			active_sfx += 1
+			if oldest == null:
+				oldest = child
+	if active_sfx >= MAX_SFX_POLYPHONY:
+		if oldest:
+			oldest.stop()
+			oldest.queue_free()
 	var player = AudioStreamPlayer.new()
 	player.bus = "SFX"
 	player.stream = _sfx_cache[sfx_name]
@@ -98,6 +122,11 @@ func play_sfx(sfx_name: String):
 	add_child(player)
 	player.play()
 	player.finished.connect(player.queue_free)
+	# 安全保底：3秒后强制清理（防止finished信号未触发）
+	get_tree().create_timer(3.0).timeout.connect(func():
+		if is_instance_valid(player) and player.is_inside_tree():
+			player.queue_free()
+	)
 
 # ---- 音量控制 ----
 

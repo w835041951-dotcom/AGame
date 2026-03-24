@@ -40,6 +40,12 @@ var mine_difficulty: float = 1.0
 #   影响：每格血量
 var boss_hp_mult: float = 1.0
 
+# ── 辅助功能 ──
+var screen_shake_enabled: bool = true      # 震屏开关
+var ui_scale: float = 1.0                  # UI缩放 (0.8 ~ 1.3)
+var colorblind_mode: int = 0               # 0=正常, 1=红绿色弱, 2=蓝黄色弱
+const COLORBLIND_LABELS = ["正常", "红绿色弱", "蓝黄色弱"]
+
 func _ready():
 	_load()
 	_apply_all()
@@ -145,6 +151,21 @@ func get_difficulty_label() -> String:
 		return DIFFICULTY_LABELS[difficulty]
 	return "自定义"
 
+func set_screen_shake(on: bool):
+	screen_shake_enabled = on
+	_save()
+	settings_changed.emit()
+
+func set_ui_scale(val: float):
+	ui_scale = clampf(val, 0.8, 1.3)
+	_save()
+	settings_changed.emit()
+
+func set_colorblind_mode(idx: int):
+	colorblind_mode = clampi(idx, 0, COLORBLIND_LABELS.size() - 1)
+	_save()
+	settings_changed.emit()
+
 # ── 持久化 ──
 
 func _save():
@@ -158,6 +179,9 @@ func _save():
 	cfg.set_value("gameplay", "difficulty", difficulty)
 	cfg.set_value("gameplay", "mine_difficulty", mine_difficulty)
 	cfg.set_value("gameplay", "boss_hp_mult", boss_hp_mult)
+	cfg.set_value("accessibility", "screen_shake", screen_shake_enabled)
+	cfg.set_value("accessibility", "ui_scale", ui_scale)
+	cfg.set_value("accessibility", "colorblind_mode", colorblind_mode)
 	cfg.save(SAVE_PATH)
 
 func _load():
@@ -173,3 +197,6 @@ func _load():
 	difficulty = cfg.get_value("gameplay", "difficulty", 1)
 	mine_difficulty = cfg.get_value("gameplay", "mine_difficulty", 1.0)
 	boss_hp_mult = cfg.get_value("gameplay", "boss_hp_mult", 1.0)
+	screen_shake_enabled = cfg.get_value("accessibility", "screen_shake", true)
+	ui_scale = cfg.get_value("accessibility", "ui_scale", 1.0)
+	colorblind_mode = cfg.get_value("accessibility", "colorblind_mode", 0)

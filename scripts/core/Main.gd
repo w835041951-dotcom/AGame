@@ -11,8 +11,10 @@ extends Node2D
 @onready var background_rect = $Background
 
 const DEFAULT_BACKGROUND_PATH = "res://assets/sprites/ui/background.png"
+const PauseMenuScript = preload("res://scripts/ui/PauseMenu.gd")
 
 var _background_cache: Dictionary = {}
+var _pause_menu: Node = null
 
 func _ready():
 	GameManager.boss_defeated.connect(_on_boss_defeated)
@@ -21,9 +23,11 @@ func _ready():
 	GameManager.combat_upgrade_triggered.connect(_on_combat_upgrade)
 	BossGrid.core_destroyed.connect(_on_combat_upgrade)
 	BossGrid.boss_attacked.connect(_on_boss_attacked)
+	BossGrid.ranged_attack.connect(_on_boss_ranged_attack)
 	BossGrid.phase_changed.connect(_on_boss_phase_changed)
 	ExplosionCalc.damage_numbers.connect(_on_damage_numbers)
 	ExplosionCalc.critical_hit.connect(_on_critical_hit)
+	ExplosionCalc.chain_triggered.connect(_on_chain_triggered)
 	MinionGrid.all_minions_cleared.connect(_on_all_minions_cleared)
 	hud.reset_board_pressed.connect(_on_reset_board)
 	bomb_selector.reset_board_pressed.connect(_on_reset_board)
@@ -33,11 +37,25 @@ func _ready():
 	combat_upgrade_panel.visible = false
 	permanent_upgrade_panel.visible = false
 
+	# 暂停菜单
+	_pause_menu = CanvasLayer.new()
+	_pause_menu.set_script(PauseMenuScript)
+	add_child(_pause_menu)
+	_pause_menu.restart_requested.connect(_on_restart)
+	_pause_menu.quit_to_title_requested.connect(_on_quit_to_title)
+
+	# 成就通知
+	AchievementManager.achievement_unlocked.connect(_on_achievement_unlocked)
+
 	# 给玩家初始炸弹，第一回合有足够弹药
 	GameManager.add_bomb("pierce_h")
 	GameManager.add_bomb("pierce_h")
 	GameManager.add_bomb("pierce_v")
 	GameManager.add_bomb("pierce_v")
+
+	# 新手引导
+	if GameManager.floor_number == 1:
+		TutorialManager.try_show("welcome", self)
 
 	_start_new_floor()
 
@@ -135,6 +153,7 @@ func _apply_floor_background():
 	if texture != null:
 		background_rect.texture = texture
 		background_rect.modulate = Color(0.82, 0.82, 0.86, 1.0)
+	_spawn_ambient_particles(floor_n)
 
 func _show_story_card_if_needed():
 	var floor_n = GameManager.floor_number
@@ -196,7 +215,7 @@ func _show_story_card_if_needed():
 	hint.position = Vector2(1020, 720)
 	hint.size = Vector2(420, 40)
 	hint.add_theme_font_size_override("font_size", 20)
-	hint.add_theme_color_override("font_color", UIThemeManager.color("text_secondary").darkened(0.2))
+	hint.add_theme_color_override("font_color", (UIThemeManager.color("text_secondary") as Color).darkened(0.2))
 	panel.add_child(hint)
 
 	var tw = create_tween()
@@ -290,6 +309,7 @@ func _on_reset_board():
 	GameManager.end_turn()
 
 func _on_boss_attacked(attack_type: int):
+	TutorialManager.try_show("first_boss_attack", self)
 	var raw_atk = LevelData.get_boss_attack(GameManager.floor_number)
 	var hp_ratio = float(GameManager.boss_hp) / max(GameManager.boss_max_hp, 1)
 	var alive_ratio = BossGrid.alive_ratio()
@@ -299,11 +319,13 @@ func _on_boss_attacked(attack_type: int):
 			# 重击：双倍伤害 + 强烈震屏
 			GameManager.take_damage(int(base_atk * 2.0))
 			_screen_shake(22.0, 0.45)
+			_flash_screen(Color(1.0, 0.1, 0.0, 0.35), 0.12)
 			_show_attack_label("重 击！", Color(0.98, 0.18, 0.05))
 		BossGrid.AttackType.CHARGE:
 			# 突进：1.5x 伤害 + 中等震屏
 			GameManager.take_damage(int(base_atk * 1.5))
 			_screen_shake(16.0, 0.38)
+			_flash_screen(Color(1.0, 0.3, 0.0, 0.25), 0.1)
 			_show_attack_label("突 进！", Color(0.95, 0.55, 0.05))
 		BossGrid.AttackType.WIDE_SWIPE:
 			# 横扫：1.2x 伤害 + 减少玩家下一回合点击数
@@ -311,10 +333,36 @@ func _on_boss_attacked(attack_type: int):
 			GameManager.apply_swipe_debuff()
 			_screen_shake(14.0, 0.5)
 			_show_attack_label("横 扫！", Color(0.7, 0.2, 0.95))
+		BossGrid.AttackType.STRAFE:
+			# 侧移：1.3x 伤害 + 大面积封锁区
+			GameManager.take_damage(int(base_atk * 1.3))
+			_screen_shake(12.0, 0.35)
+			_flash_screen(Color(1.0, 0.2, 0.2, 0.25), 0.1)
+			_show_attack_label("侧 移！", Color(0.3, 0.7, 0.95))
+		BossGrid.AttackType.BURROW:
+			# 潜地：0.6x 伤害 + 大面积封锁
+			GameManager.take_damage(int(base_atk * 0.6))
+			_screen_shake(10.0, 0.3)
+			_flash_screen(Color(0.8, 0.3, 0.1, 0.2), 0.12)
+			_show_attack_label("潜 地！", Color(0.5, 0.35, 0.2))
 		_:
 			# 普通攻击
 			GameManager.take_damage(base_atk)
 			_screen_shake()
+			_flash_screen(Color(1.0, 0.15, 0.1, 0.2), 0.1)
+			_show_attack_label("攻 击！", Color(0.95, 0.55, 0.45))
+
+func _on_boss_ranged_attack(attack_type: int):
+	# 远程轰炸：Boss不在左边界也能发动，造成伤害+封锁
+	var raw_atk = LevelData.get_boss_attack(GameManager.floor_number)
+	var hp_ratio = float(GameManager.boss_hp) / max(GameManager.boss_max_hp, 1)
+	var base_atk = max(1, int(raw_atk * hp_ratio * 0.5))
+	GameManager.take_damage(base_atk)
+	_screen_shake(10.0, 0.3)
+	_flash_screen(Color(1.0, 0.1, 0.0, 0.3), 0.12)
+	_show_attack_label("远程轰炸！", Color(1.0, 0.4, 0.15))
+	# 在玩家区域产生封锁
+	BossGrid.add_temporary_blocks(Vector2i(randi_range(0, 3), randi_range(0, BossGrid.placement_rows - 1)), 2)
 
 func _show_attack_label(text: String, color: Color):
 	var canvas = CanvasLayer.new()
@@ -342,6 +390,8 @@ func _show_attack_label(text: String, color: Color):
 	tw.tween_callback(canvas.queue_free)
 
 func _screen_shake(intensity: float = 10.0, duration: float = 0.3):
+	if not GameSettings.screen_shake_enabled:
+		return
 	var tween = create_tween()
 	var steps = 6
 	var step_dur = duration / (steps + 1)
@@ -375,6 +425,7 @@ func _on_boss_defeated():
 	# 再显示永久升级面板
 	await get_tree().create_timer(0.4).timeout
 	permanent_upgrade_panel.show_choices(UpgradeManager.get_permanent_choices(3))
+	TutorialManager.try_show("first_upgrade", self)
 	_animate_panel_in(permanent_upgrade_panel)
 
 func _show_boss_death_flash():
@@ -451,10 +502,12 @@ func _on_damage_numbers(cell_damages: Dictionary):
 	add_child(canvas)
 	var cs = LevelData.get_cell_size(GameManager.floor_number)
 	var view_pos = placement_view.global_position
+	var total_dmg = 0
 	for cell in cell_damages:
 		var dmg: int = cell_damages[cell]
 		if dmg <= 0:
 			continue
+		total_dmg += dmg
 		var lbl = Label.new()
 		lbl.text = "-%d" % dmg
 		var font_size = 28 if dmg < 30 else (38 if dmg < 60 else 50)
@@ -468,11 +521,18 @@ func _on_damage_numbers(cell_damages: Dictionary):
 		var wy = view_pos.y + cell.y * cs + cs * 0.1
 		lbl.position = Vector2(wx, wy)
 		lbl.modulate = Color(1, 1, 1, 0)
+		lbl.pivot_offset = Vector2(20, 12)
 		canvas.add_child(lbl)
+		# Pop + float animation
 		var tw = create_tween()
-		tw.tween_property(lbl, "modulate:a", 1.0, 0.1)
+		tw.tween_property(lbl, "modulate:a", 1.0, 0.06)
+		tw.parallel().tween_property(lbl, "scale", Vector2(1.25, 1.25), 0.06)
+		tw.tween_property(lbl, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_BACK)
 		tw.tween_property(lbl, "position:y", wy - 55, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.25).set_delay(0.35)
+	# 大量伤害时微震
+	if total_dmg >= 40:
+		_screen_shake(min(total_dmg * 0.15, 12.0), 0.15)
 	await get_tree().create_timer(0.8).timeout
 	canvas.queue_free()
 
@@ -483,6 +543,7 @@ func _animate_panel_in(panel: Control):
 
 func _on_game_over():
 	GameManager.timer_running = false
+	AchievementManager.end_run()
 	# 禁用所有游戏交互
 	placement_view.process_mode = Node.PROCESS_MODE_DISABLED
 	mine_view.process_mode = Node.PROCESS_MODE_DISABLED
@@ -545,32 +606,37 @@ func _show_game_over_screen():
 	overlay.add_child(info)
 
 	# ── 战斗统计 ──
-	var stats_text = "⚡ 总伤害: %d    💣 炸弹使用: %d    🔗 最大连锁: %d    🏆 通过层数: %d" % [
-		GameManager.stat_total_damage,
-		GameManager.stat_bombs_used,
-		GameManager.stat_max_chain,
-		GameManager.stat_floors_cleared
+	var stats_lines = [
+		"⚡ 总伤害: %d" % GameManager.stat_total_damage,
+		"💣 炸弹使用: %d" % GameManager.stat_bombs_used,
+		"🔗 最大连锁: %d" % GameManager.stat_max_chain,
+		"🏆 通过层数: %d" % GameManager.stat_floors_cleared,
+		"🎯 击杀Boss: %d" % AchievementManager.stats.get("bosses_killed", 0),
 	]
-	var stats = Label.new()
-	stats.text = stats_text
-	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stats.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	stats.position = Vector2(0, 560)
-	stats.size = Vector2(1920, 50)
-	stats.add_theme_font_size_override("font_size", 26)
-	stats.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
-	stats.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	stats.add_theme_constant_override("shadow_offset_x", 1)
-	stats.add_theme_constant_override("shadow_offset_y", 1)
-	stats.modulate = Color(1, 1, 1, 0)
-	overlay.add_child(stats)
+	var stat_y = 545.0
+	var stat_nodes: Array = []
+	for line in stats_lines:
+		var s = Label.new()
+		s.text = line
+		s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		s.position = Vector2(0, stat_y)
+		s.size = Vector2(1920, 34)
+		s.add_theme_font_size_override("font_size", 22)
+		s.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55))
+		s.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+		s.add_theme_constant_override("shadow_offset_x", 1)
+		s.add_theme_constant_override("shadow_offset_y", 1)
+		s.modulate = Color(1, 1, 1, 0)
+		overlay.add_child(s)
+		stat_nodes.append(s)
+		stat_y += 30.0
 
 	# ── 评价 ──
 	var rating_text = _get_run_rating()
 	var rating = Label.new()
 	rating.text = rating_text
 	rating.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rating.position = Vector2(0, 620)
+	rating.position = Vector2(0, stat_y + 10)
 	rating.size = Vector2(1920, 50)
 	rating.add_theme_font_size_override("font_size", 30)
 	rating.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
@@ -580,17 +646,35 @@ func _show_game_over_screen():
 	rating.modulate = Color(1, 1, 1, 0)
 	overlay.add_child(rating)
 
-	# ── 重启提示 ──
-	var hint = Label.new()
-	hint.text = "按 F5 重新开始"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hint.position = Vector2(0, 690)
-	hint.size = Vector2(1920, 50)
-	hint.add_theme_font_size_override("font_size", 28)
-	hint.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
-	hint.modulate = Color(1, 1, 1, 0)
-	overlay.add_child(hint)
+	# ── 操作按钮 ──
+	var btn_box = HBoxContainer.new()
+	btn_box.position = Vector2(560, stat_y + 70)
+	btn_box.size = Vector2(800, 60)
+	btn_box.add_theme_constant_override("separation", 40)
+	btn_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_box.modulate = Color(1, 1, 1, 0)
+	overlay.add_child(btn_box)
+
+	var retry_btn = Button.new()
+	retry_btn.text = "🔄 重新开始"
+	retry_btn.custom_minimum_size = Vector2(200, 56)
+	retry_btn.add_theme_font_size_override("font_size", 28)
+	retry_btn.add_theme_color_override("font_color", UIThemeManager.color("text_heal"))
+	var rs = UIThemeManager.make_stylebox("btn_normal_bg", "btn_normal_brd")
+	retry_btn.add_theme_stylebox_override("normal", rs)
+	retry_btn.add_theme_stylebox_override("hover", UIThemeManager.make_stylebox("btn_hover_bg", "border_strong"))
+	retry_btn.pressed.connect(_on_restart)
+	btn_box.add_child(retry_btn)
+
+	var title_btn = Button.new()
+	title_btn.text = "🏠 返回标题"
+	title_btn.custom_minimum_size = Vector2(200, 56)
+	title_btn.add_theme_font_size_override("font_size", 28)
+	title_btn.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
+	title_btn.add_theme_stylebox_override("normal", rs.duplicate())
+	title_btn.add_theme_stylebox_override("hover", UIThemeManager.make_stylebox("btn_hover_bg", "border_strong"))
+	title_btn.pressed.connect(_on_quit_to_title)
+	btn_box.add_child(title_btn)
 
 	# ═══ 动画序列 ═══
 	# 1. 遮罩渐暗
@@ -619,29 +703,59 @@ func _show_game_over_screen():
 	tw_i2.tween_property(info, "modulate:a", 1.0, 0.5)
 
 	# 5. 统计数据逐行淡入
-	var tw_s = create_tween().set_ease(Tween.EASE_OUT)
-	tw_s.tween_interval(1.8)
-	tw_s.tween_property(stats, "modulate:a", 1.0, 0.5)
+	var stat_base_delay = 1.8
+	for si in range(stat_nodes.size()):
+		var tw_sn = create_tween().set_ease(Tween.EASE_OUT)
+		tw_sn.tween_interval(stat_base_delay + si * 0.15)
+		tw_sn.tween_property(stat_nodes[si], "modulate:a", 1.0, 0.35)
 
 	# 6. 评价淡入
 	var tw_r = create_tween().set_ease(Tween.EASE_OUT)
-	tw_r.tween_interval(2.4)
+	tw_r.tween_interval(stat_base_delay + stat_nodes.size() * 0.15 + 0.3)
 	tw_r.tween_property(rating, "modulate:a", 1.0, 0.5)
 
-	# 7. 重启提示淡入 + 呼吸闪烁
+	# 7. 按钮淡入
 	var tw_h = create_tween()
-	tw_h.tween_interval(3.0)
-	tw_h.tween_property(hint, "modulate:a", 1.0, 0.5)
-	tw_h.tween_callback(func():
-		var pulse = create_tween().set_loops()
-		pulse.tween_property(hint, "modulate:a", 0.3, 1.2)
-		pulse.tween_property(hint, "modulate:a", 1.0, 1.2)
-	)
+	tw_h.tween_interval(stat_base_delay + stat_nodes.size() * 0.15 + 1.0)
+	tw_h.tween_property(btn_box, "modulate:a", 1.0, 0.5)
 
 # 升级选完后继续（由 UpgradePanel 回调）
 func on_combat_upgrade_chosen():
 	combat_upgrade_panel.visible = false
-	# 回合流程由 _wait_for_combat_upgrade() 继续，无需手动恢复计时器
+	_show_upgrade_flash("增益获得！", Color(0.3, 0.85, 1.0))
+
+func on_permanent_upgrade_chosen():
+	permanent_upgrade_panel.visible = false
+	_show_upgrade_flash("强化完成！", Color(1.0, 0.85, 0.2))
+	GameManager.next_floor()
+	_start_new_floor()
+
+func _show_upgrade_flash(text: String, color: Color):
+	_flash_screen(color.lerp(Color.WHITE, 0.5), 0.06)
+	var canvas = CanvasLayer.new()
+	canvas.layer = 76
+	add_child(canvas)
+	var lbl = Label.new()
+	lbl.text = text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, 500)
+	lbl.size = Vector2(1920, 60)
+	lbl.add_theme_font_size_override("font_size", 36)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	lbl.add_theme_constant_override("shadow_offset_x", 2)
+	lbl.add_theme_constant_override("shadow_offset_y", 2)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 30)
+	canvas.add_child(lbl)
+	var tw = create_tween()
+	tw.tween_property(lbl, "modulate:a", 1.0, 0.08)
+	tw.parallel().tween_property(lbl, "scale", Vector2(1.2, 1.2), 0.08)
+	tw.tween_property(lbl, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_BACK)
+	tw.tween_interval(0.5)
+	tw.tween_property(lbl, "position:y", 470.0, 0.25)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.25)
+	tw.tween_callback(canvas.queue_free)
 
 func _get_run_rating() -> String:
 	var floor_n = GameManager.floor_number
@@ -656,11 +770,6 @@ func _get_run_rating() -> String:
 		return "💥 爆破专家！虽败犹荣！"
 	else:
 		return "🌱 初出茅庐，下次会更好！"
-
-func on_permanent_upgrade_chosen():
-	permanent_upgrade_panel.visible = false
-	GameManager.next_floor()
-	_start_new_floor()
 
 func _on_all_minions_cleared():
 	# 所有小怪已消灭，Boss入场
@@ -696,10 +805,23 @@ func _show_boss_enter_label(boss_name: String):
 func _on_boss_phase_changed(phase: int):
 	if phase <= 1:
 		return
-	var txt = "Boss P%d" % phase
-	var color = Color(1.0, 0.8, 0.2) if phase == 2 else Color(1.0, 0.2, 0.2)
-	_show_reward_popup(txt, color, 40)
-	_screen_shake(5.0 + phase * 2.0, 0.14)
+	var txt: String
+	var color: Color
+	var font_size: int
+	if phase >= 3:
+		txt = "最终阶段！"
+		color = Color(1.0, 0.15, 0.1)
+		font_size = 56
+		_screen_shake(14.0, 0.5)
+		_flash_screen(Color(1.0, 0.1, 0.0, 0.3), 0.15)
+		AudioManager.play_sfx("boss_hit")
+	else:
+		txt = "Boss 狂暴化！"
+		color = Color(1.0, 0.75, 0.15)
+		font_size = 48
+		_screen_shake(8.0, 0.3)
+		_flash_screen(Color(1.0, 0.6, 0.0, 0.2), 0.1)
+	_show_phase_banner(txt, color, font_size)
 # ======== 趣味性系统 ========
 
 # ---- Lucky Find 弹窗 ----
@@ -712,12 +834,19 @@ func _on_streak_bonus(streak: int, reward_text: String):
 	_show_reward_popup(reward_text, color, 36)
 	_screen_shake(4.0 + streak, 0.15)
 
+# ---- 连锁触发反馈 ----
+func _on_chain_triggered(chained_positions: Array):
+	_show_chain_celebration(chained_positions.size())
+
 # ---- Critical Hit 闪光 ----
 func _on_critical_hit(cell: Vector2i, damage: int):
 	var cs = LevelData.get_cell_size(GameManager.floor_number)
 	var view_pos = placement_view.global_position
 	var wx = view_pos.x + cell.x * cs + cs * 0.5
 	var wy = view_pos.y + cell.y * cs
+
+	# 暴击整屏微闪
+	_flash_screen(Color(1.0, 0.9, 0.3, 0.15), 0.08)
 
 	var canvas = CanvasLayer.new()
 	canvas.layer = 72
@@ -817,3 +946,188 @@ func _show_damage_summary(total_damage: int):
 	tw4.tween_interval(0.6)
 	tw4.tween_property(lbl, "modulate:a", 0.0, 0.3)
 	tw4.tween_callback(canvas.queue_free)
+
+# ---- 暂停菜单回调 ----
+func _on_restart():
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+func _on_quit_to_title():
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/ui/TitleScreen.tscn")
+
+# ---- 成就解锁通知 ----
+func _on_achievement_unlocked(id: String, title: String):
+	var ach = AchievementManager.ACHIEVEMENTS.get(id, {})
+	var icon = ach.get("icon", "🏆")
+	var canvas = CanvasLayer.new()
+	canvas.layer = 95
+	add_child(canvas)
+	var panel = PanelContainer.new()
+	panel.position = Vector2(1440, -80)
+	panel.size = Vector2(440, 70)
+	var ps = StyleBoxFlat.new()
+	ps.bg_color = Color(0.08, 0.06, 0.12, 0.92)
+	ps.border_color = Color(1.0, 0.85, 0.2, 0.8)
+	ps.set_border_width_all(2)
+	ps.set_corner_radius_all(12)
+	ps.shadow_color = Color(0, 0, 0, 0.4)
+	ps.shadow_size = 6
+	panel.add_theme_stylebox_override("panel", ps)
+	canvas.add_child(panel)
+	var lbl = Label.new()
+	lbl.text = "%s 成就解锁: %s" % [icon, title]
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	panel.add_child(lbl)
+	var tw = create_tween()
+	tw.tween_property(panel, "position:y", 20.0, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(2.5)
+	tw.tween_property(panel, "position:y", -80.0, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_callback(canvas.queue_free)
+
+# ---- 连锁庆祝 ----
+func _show_chain_celebration(chain_count: int):
+	if chain_count < 2:
+		return
+	var text: String
+	var color: Color
+	var font_size: int
+	if chain_count >= 8:
+		text = "超 级 连 锁 ×%d！" % chain_count
+		color = Color(1.0, 0.15, 0.85)
+		font_size = 72
+	elif chain_count >= 5:
+		text = "连 锁 ×%d！" % chain_count
+		color = Color(0.85, 0.3, 1.0)
+		font_size = 60
+	elif chain_count >= 3:
+		text = "连锁 ×%d" % chain_count
+		color = Color(1.0, 0.65, 0.1)
+		font_size = 48
+	else:
+		text = "连锁 ×%d" % chain_count
+		color = Color(0.4, 0.9, 1.0)
+		font_size = 40
+
+	var canvas = CanvasLayer.new()
+	canvas.layer = 73
+	add_child(canvas)
+
+	var lbl = Label.new()
+	lbl.text = text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, 360)
+	lbl.size = Vector2(1920, 100)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 3)
+	lbl.add_theme_constant_override("shadow_offset_y", 3)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 50)
+	canvas.add_child(lbl)
+
+	var tw = create_tween()
+	tw.tween_property(lbl, "modulate:a", 1.0, 0.08)
+	tw.parallel().tween_property(lbl, "scale", Vector2(1.3, 1.3), 0.08)
+	tw.tween_property(lbl, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK)
+	tw.tween_interval(0.6)
+	tw.tween_property(lbl, "position:y", 320.0, 0.3)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(canvas.queue_free)
+
+	if chain_count >= 5:
+		_screen_shake(3.0 + chain_count, 0.2)
+	if chain_count >= 3:
+		_flash_screen(color.lerp(Color.WHITE, 0.5), 0.06)
+
+# ---- 整屏微闪（暴击/连锁/Boss死亡用） ----
+func _flash_screen(color: Color, duration: float = 0.08):
+	var canvas = CanvasLayer.new()
+	canvas.layer = 74
+	add_child(canvas)
+	var flash = ColorRect.new()
+	flash.color = color
+	flash.size = Vector2(1920, 1080)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(flash)
+	var tw = create_tween()
+	tw.tween_property(flash, "color:a", 0.0, duration * 4).set_trans(Tween.TRANS_EXPO)
+	tw.tween_callback(canvas.queue_free)
+
+# ---- Boss阶段转换横幅 ----
+func _show_phase_banner(text: String, color: Color, font_size: int):
+	var canvas = CanvasLayer.new()
+	canvas.layer = 86
+	add_child(canvas)
+
+	# 横幅背景条
+	var bar = ColorRect.new()
+	bar.color = Color(0, 0, 0, 0.0)
+	bar.size = Vector2(1920, 120)
+	bar.position = Vector2(0, 480)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(bar)
+
+	var lbl = Label.new()
+	lbl.text = text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.position = Vector2(0, 0)
+	lbl.size = Vector2(1920, 120)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	lbl.add_theme_constant_override("shadow_offset_x", 4)
+	lbl.add_theme_constant_override("shadow_offset_y", 4)
+	lbl.modulate = Color(1, 1, 1, 0)
+	lbl.pivot_offset = Vector2(960, 60)
+	bar.add_child(lbl)
+
+	var tw = create_tween()
+	# Bar slides in
+	tw.tween_property(bar, "color:a", 0.75, 0.15)
+	tw.parallel().tween_property(lbl, "modulate:a", 1.0, 0.1)
+	tw.parallel().tween_property(lbl, "scale", Vector2(1.15, 1.15), 0.1)
+	tw.tween_property(lbl, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK)
+	tw.tween_interval(0.9)
+	tw.tween_property(bar, "color:a", 0.0, 0.3)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(canvas.queue_free)
+
+# ---- 环境粒子（浮尘/光点） ----
+var _ambient_particles: Array = []
+
+func _spawn_ambient_particles(floor_n: int):
+	# 清除旧粒子
+	for p in _ambient_particles:
+		if is_instance_valid(p):
+			p.queue_free()
+	_ambient_particles.clear()
+
+	var level_color = LevelData.get_level_color(floor_n)
+	var particle_color = level_color.lerp(Color(1, 1, 1, 0.15), 0.6)
+
+	for i in range(12):
+		var dot = ColorRect.new()
+		var sz = randf_range(2.0, 5.0)
+		dot.size = Vector2(sz, sz)
+		dot.color = particle_color
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dot.z_index = -1
+		dot.position = Vector2(randf_range(0, 1920), randf_range(0, 1080))
+		dot.modulate = Color(1, 1, 1, randf_range(0.1, 0.4))
+		add_child(dot)
+		_ambient_particles.append(dot)
+
+		# Slow float + fade loop
+		var dur = randf_range(6.0, 14.0)
+		var tw_p = create_tween().set_loops()
+		tw_p.tween_property(dot, "position:y", dot.position.y - randf_range(60, 180), dur).set_trans(Tween.TRANS_SINE)
+		tw_p.parallel().tween_property(dot, "position:x", dot.position.x + randf_range(-40, 40), dur).set_trans(Tween.TRANS_SINE)
+		tw_p.parallel().tween_property(dot, "modulate:a", randf_range(0.05, 0.2), dur * 0.5)
+		tw_p.tween_property(dot, "position", Vector2(randf_range(0, 1920), randf_range(0, 1080)), 0.05)
+		tw_p.tween_property(dot, "modulate:a", randf_range(0.15, 0.4), dur * 0.5)

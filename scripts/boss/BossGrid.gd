@@ -90,6 +90,7 @@ func setup():
 	tiles_refreshed.emit()
 	phase_changed.emit(current_phase)
 	field_changed.emit()
+	_roll_next_intent()
 
 func update_phase_by_hp(cur_hp: int, max_hp: int):
 	if max_hp <= 0:
@@ -109,6 +110,11 @@ func on_new_turn():
 	update_phase_by_hp(GameManager.boss_hp, max(GameManager.boss_max_hp, 1))
 	_decay_blocks()
 	_generate_field_mechanics()
+	# 远程轰炸：Boss每回合有概率发动远程攻击（不需要到达左边界）
+	if current_phase >= 2 and _turn_count >= 3:
+		var bombard_chance = 0.15 if current_phase == 2 else 0.30
+		if randf() < bombard_chance:
+			ranged_attack.emit(AttackType.BOMBARD)
 
 func _decay_blocks():
 	for pos in blocked_ttl.keys():
@@ -132,20 +138,10 @@ func _generate_field_mechanics():
 		for i in range(shield_n):
 			shielded_cells.append(alive_world[i])
 
-		# 随机封锁格（不能布弹）
-		var candidates: Array = []
-		for y in range(placement_rows):
-			for x in range(placement_cols):
-				var w = Vector2i(x, y)
-				if is_boss_tile(w):
-					continue
-				if MinionGrid.is_minion_tile(w):
-					continue
-				candidates.append(w)
-		candidates.shuffle()
-		var block_n = min(1 + (1 if current_phase >= 3 else 0), candidates.size())
-		for i in range(block_n):
-			blocked_ttl[candidates[i]] = max(blocked_ttl.get(candidates[i], 0), 1)
+		# 在 Boss 身边制造成片封锁，而不是随机散点
+		var pattern_count = 1 if current_phase == 2 else 2
+		for i in range(pattern_count):
+			_apply_boss_pressure_pattern(1)
 
 	if current_phase >= 3:
 		# 污染地块：伤害衰减
@@ -168,16 +164,65 @@ func is_polluted_cell(world_pos: Vector2i) -> bool:
 func is_shielded_cell(world_pos: Vector2i) -> bool:
 	return world_pos in shielded_cells
 
-func add_temporary_blocks(center: Vector2i, radius: int = 1):
+func add_temporary_blocks(center: Vector2i, radius: int = 2):
 	for dy in range(-radius, radius + 1):
 		for dx in range(-radius, radius + 1):
 			var p = center + Vector2i(dx, dy)
-			if p.x < 0 or p.x >= placement_cols or p.y < 0 or p.y >= placement_rows:
-				continue
-			if is_boss_tile(p) or MinionGrid.is_minion_tile(p):
-				continue
-			blocked_ttl[p] = max(blocked_ttl.get(p, 0), 1)
+			_block_cell(p, 1)
 	field_changed.emit()
+
+func _block_cell(world_pos: Vector2i, ttl: int = 1):
+	if world_pos.x < 0 or world_pos.x >= placement_cols or world_pos.y < 0 or world_pos.y >= placement_rows:
+		return
+	if is_boss_tile(world_pos) or MinionGrid.is_minion_tile(world_pos):
+		return
+	blocked_ttl[world_pos] = max(blocked_ttl.get(world_pos, 0), ttl)
+
+func _boss_front_anchor() -> Vector2i:
+	var anchor_x = max(0, boss_origin.x - 1)
+	var anchor_y = clampi(boss_origin.y + int(boss_height / 2), 0, placement_rows - 1)
+	return Vector2i(anchor_x, anchor_y)
+
+func _apply_block_pattern(center: Vector2i, pattern: String, ttl: int = 1):
+	var offsets: Array[Vector2i] = []
+	match pattern:
+		"cross":
+			offsets = [
+				Vector2i.ZERO,
+				Vector2i.LEFT, Vector2i.RIGHT,
+				Vector2i.UP, Vector2i.DOWN,
+				Vector2i.LEFT * 2, Vector2i.RIGHT * 2,
+			]
+		"horizontal":
+			offsets = [
+				Vector2i.ZERO,
+				Vector2i.LEFT, Vector2i.RIGHT,
+				Vector2i.LEFT * 2, Vector2i.RIGHT * 2,
+				Vector2i.LEFT * 3, Vector2i.RIGHT * 3,
+			]
+		"vertical":
+			offsets = [
+				Vector2i.ZERO,
+				Vector2i.UP, Vector2i.DOWN,
+				Vector2i.UP * 2, Vector2i.DOWN * 2,
+			]
+		"square":
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					offsets.append(Vector2i(dx, dy))
+		_:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					offsets.append(Vector2i(dx, dy))
+
+	for offset in offsets:
+		_block_cell(center + offset, ttl)
+
+func _apply_boss_pressure_pattern(ttl: int = 1):
+	var anchor = _boss_front_anchor()
+	var patterns = ["cross", "horizontal", "vertical", "square"]
+	var pattern = patterns.pick_random()
+	_apply_block_pattern(anchor, pattern, ttl)
 
 func _calc_boss_bounds(shape: Array):
 	var max_x = 0
@@ -274,9 +319,13 @@ func _on_tile_destroyed(local_pos: Vector2i, tile: Dictionary):
 		BodyPart.CORE:
 			core_destroyed.emit()
 
-enum AttackType { NORMAL, CHARGE, SLAM, WIDE_SWIPE }
+enum AttackType { NORMAL, CHARGE, SLAM, WIDE_SWIPE, STRAFE, BURROW, BOMBARD }
 
 signal boss_attacked(attack_type: AttackType)  # Boss走出左边界，攻击玩家
+signal attack_intent_changed(attack_type: AttackType)  # 预告下一次攻击类型
+signal ranged_attack(attack_type: AttackType)  # 远程攻击（Boss不在左边界也能发动）
+
+var next_attack_intent: AttackType = AttackType.NORMAL
 
 func has_alive_at_left_edge() -> bool:
 	for pos in tiles:
@@ -289,11 +338,18 @@ func move_left():
 	if has_alive_at_left_edge():
 		var atk = _choose_attack()
 		boss_attacked.emit(atk)
+		_roll_next_intent()
 		return
 	boss_origin.x -= 1
+	# 高层Move时有概率垂直漂移
+	if current_phase >= 2 and randf() < 0.3:
+		var shift = [-1, 1].pick_random()
+		var new_y = clampi(boss_origin.y + shift, 0, placement_rows - boss_height)
+		boss_origin.y = new_y
 	if has_alive_at_left_edge():
 		var atk = _choose_attack()
 		boss_attacked.emit(atk)
+		_roll_next_intent()
 	boss_moved.emit(boss_origin)
 
 func random_move():
@@ -301,6 +357,7 @@ func random_move():
 	if has_alive_at_left_edge():
 		var atk = _choose_attack()
 		boss_attacked.emit(atk)
+		_roll_next_intent()
 		return
 
 	# P3 狂暴：有概率额外前压1格
@@ -309,11 +366,39 @@ func random_move():
 		boss_moved.emit(boss_origin)
 		if has_alive_at_left_edge():
 			boss_attacked.emit(AttackType.SLAM)
+			_roll_next_intent()
 			return
 
-	# 高层有概率触发特殊移动
+	# BURROW: Boss消失1回合（跳过移动），下回合再出现并前压
 	var floor_n = GameManager.floor_number
 	var level_idx = LevelData.get_level(floor_n)["id"]
+	if next_attack_intent == AttackType.BURROW and boss_origin.x > 1:
+		# 潜地：本回合不移动，在 Boss 身前连续铺出大片封锁
+		var anchor = _boss_front_anchor()
+		_apply_block_pattern(anchor, "square", 2)
+		_apply_block_pattern(anchor + Vector2i.LEFT * 2, "cross", 2)
+		field_changed.emit()
+		boss_attacked.emit(AttackType.BURROW)
+		_roll_next_intent()
+		return
+
+	# STRAFE: Boss上下平移（不前进）
+	if next_attack_intent == AttackType.STRAFE:
+		var shift = [-1, 1].pick_random()
+		var new_y = clampi(boss_origin.y + shift, 0, placement_rows - boss_height)
+		if new_y != boss_origin.y:
+			boss_origin.y = new_y
+			boss_moved.emit(boss_origin)
+		# 侧移时在 Boss 前方打出纵向封锁带
+		var anchor = _boss_front_anchor()
+		_apply_block_pattern(anchor, "vertical", 2)
+		_apply_block_pattern(anchor + Vector2i.LEFT, "vertical", 2)
+		field_changed.emit()
+		boss_attacked.emit(AttackType.STRAFE)
+		_roll_next_intent()
+		return
+
+	# 高层有概率触发特殊移动
 	var charge_chance = min(0.02 * level_idx, 0.35)  # 每关+2%，最高35%
 	if boss_origin.x > 1 and randf() < charge_chance:
 		# 突进：移动2格
@@ -324,19 +409,55 @@ func random_move():
 			boss_attacked.emit(AttackType.CHARGE)
 	else:
 		move_left()
+	_roll_next_intent()
 
 func _choose_attack() -> AttackType:
 	var floor_n = GameManager.floor_number
 	var level_idx = LevelData.get_level(floor_n)["id"]  # 1-20 within cycle
-	# 高层Boss有更强攻击模式
 	var roll = randf()
-	if level_idx >= 15 and roll < 0.25:
-		return AttackType.WIDE_SWIPE   # 横扫：对玩家造成AOE伤害
-	elif level_idx >= 8 and roll < 0.45:
-		return AttackType.SLAM         # 重击：造成双倍伤害
-	elif level_idx >= 4 and roll < 0.60:
-		return AttackType.CHARGE       # 突进：造成1.5x伤害
+	if level_idx >= 8 and roll < 0.20:
+		return AttackType.WIDE_SWIPE
+	elif level_idx >= 4 and roll < 0.40:
+		return AttackType.SLAM
+	elif roll < 0.55:
+		return AttackType.CHARGE
 	return AttackType.NORMAL
+
+func _roll_next_intent():
+	var floor_n = GameManager.floor_number
+	var level_idx = LevelData.get_level(floor_n)["id"]
+	var roll = randf()
+	if level_idx >= 10 and roll < 0.10:
+		next_attack_intent = AttackType.BURROW
+	elif level_idx >= 6 and roll < 0.22:
+		next_attack_intent = AttackType.STRAFE
+	elif level_idx >= 12 and roll < 0.32:
+		next_attack_intent = AttackType.WIDE_SWIPE
+	elif level_idx >= 4 and roll < 0.50:
+		next_attack_intent = AttackType.SLAM
+	else:
+		next_attack_intent = AttackType.NORMAL
+	attack_intent_changed.emit(next_attack_intent)
+
+static func attack_type_name(t: AttackType) -> String:
+	match t:
+		AttackType.SLAM: return "重击"
+		AttackType.CHARGE: return "突进"
+		AttackType.WIDE_SWIPE: return "横扫"
+		AttackType.STRAFE: return "侧移"
+		AttackType.BURROW: return "潜地"
+		AttackType.BOMBARD: return "轰炸"
+		_: return "普通"
+
+static func attack_type_icon(t: AttackType) -> String:
+	match t:
+		AttackType.SLAM: return "💥"
+		AttackType.CHARGE: return "🏃"
+		AttackType.WIDE_SWIPE: return "🌊"
+		AttackType.STRAFE: return "↕"
+		AttackType.BURROW: return "🕳"
+		AttackType.BOMBARD: return "🎯"
+		_: return "⚔"
 
 func _random_type() -> TileType:
 	# 暂时禁用类型差异，所有格子统一为NORMAL
@@ -354,8 +475,10 @@ func _random_type() -> TileType:
 	#return TileType.NORMAL
 
 func _max_hp_for_type(_type: TileType) -> int:
-	# 暂时统一血量
-	return 10
+	# 将Boss总血量稳定在可控区间，避免贴图网格变大导致数值失控
+	var shape_size = max(1, LevelData.get_boss_shape(GameManager.floor_number).size())
+	var hp_per_tile = int(round(110.0 / float(shape_size)))
+	return clampi(hp_per_tile, 3, 10)
 	# --- 保留原逻辑 ---
 	#match type:
 	#	TileType.WEAK:   return 5

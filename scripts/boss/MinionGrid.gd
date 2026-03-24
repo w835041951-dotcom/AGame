@@ -22,6 +22,8 @@ const MINION_TYPES = {
 	"brute":    { "hp": 15, "drop": "cross",    "label": "骷髅兵",  "color": Color(0.85, 0.82, 0.70) },
 	"shield":   { "hp": 20, "drop": "bounce",   "label": "盾卫",    "color": Color(0.55, 0.58, 0.62) },
 	"volatile": { "hp": 6,  "drop": "scatter",  "label": "爆炸蜘蛛","color": Color(0.95, 0.45, 0.15) },
+	"reflect":  { "hp": 12, "drop": "pierce_v", "label": "镜魔",    "color": Color(0.6, 0.3, 0.95) },
+	"healer":   { "hp": 10, "drop": "cross",    "label": "祭司",    "color": Color(0.3, 0.95, 0.7) },
 }
 
 func setup():
@@ -72,10 +74,18 @@ func apply_damage(world_pos: Vector2i, amount: int) -> int:
 	var tile = minion_tiles[world_pos]
 	if not tile["alive"]:
 		return 0
+	# 镜魔：反射30%伤害给玩家
+	if tile["mtype"] == "reflect":
+		var reflected = max(1, int(amount * 0.3))
+		GameManager.take_damage(reflected)
 	var actual = min(amount, tile["hp"])
 	tile["hp"] -= actual
 	if tile["hp"] <= 0:
 		tile["alive"] = false
+		# 祭司：死亡时回复Boss 5% HP
+		if tile["mtype"] == "healer":
+			var heal_amt = max(1, int(GameManager.boss_max_hp * 0.05))
+			GameManager.boss_hp = min(GameManager.boss_hp + heal_amt, GameManager.boss_max_hp)
 		var drop = tile["drop_type"]
 		minion_defeated.emit(world_pos, drop)
 		_check_all_cleared()
@@ -117,6 +127,10 @@ func spawn_random_minion(count: int = 1):
 	for i in range(min(count, spawn_candidates.size())):
 		var world_pos = spawn_candidates[i]
 		var type_pool = ["grunt", "shield", "volatile"]
+		if BossGrid.current_phase >= 2:
+			type_pool.append("reflect")
+		if BossGrid.current_phase >= 3:
+			type_pool.append("healer")
 		var mtype = type_pool[randi() % type_pool.size()]
 		var def = MINION_TYPES.get(mtype, MINION_TYPES["grunt"])
 		var hp_mult = LevelData.get_hp_multiplier(GameManager.floor_number)
@@ -126,7 +140,7 @@ func spawn_random_minion(count: int = 1):
 			"max_hp": hp,
 			"alive": true,
 			"drop_type": def["drop"],
-			"label": "召",
+			"label": def["label"],
 			"color": def["color"],
 			"mtype": mtype,
 		}

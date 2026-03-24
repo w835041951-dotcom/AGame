@@ -13,6 +13,7 @@ signal reset_board_pressed
 
 var _intel_label: Label = null
 var _challenge_label: Label = null
+var _intent_label: Label = null
 
 var _reset_btn: Button = null
 var _last_timer_int: int = -1
@@ -21,16 +22,27 @@ var _prev_player_hp: int = -1
 var _hud_bar_bg: TextureRect = null
 var _label_bg_nodes: Array = []
 var _icon_nodes: Array = []
+var _vignette: ColorRect = null
+var _vignette_alpha: float = 0.0
 
 func _ready():
 	_create_reset_button()
 	_create_runtime_labels()
+	_create_vignette()
 	_build_themed_visuals()
 	_apply_theme()
 	UIThemeManager.theme_changed.connect(func(_n):
 		_rebuild_themed_visuals()
 		_apply_theme()
 	)
+
+func _create_vignette():
+	_vignette = ColorRect.new()
+	_vignette.color = Color(0.8, 0.0, 0.0, 0.0)
+	_vignette.size = Vector2(1920, 1080)
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vignette.z_index = 10
+	add_child(_vignette)
 
 func _build_themed_visuals():
 	# HUD底板
@@ -128,9 +140,15 @@ func _create_runtime_labels():
 
 	_challenge_label = Label.new()
 	_challenge_label.position = Vector2(620, 16)
-	_challenge_label.size = Vector2(760, 38)
+	_challenge_label.size = Vector2(560, 38)
 	_challenge_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_challenge_label)
+
+	_intent_label = Label.new()
+	_intent_label.position = Vector2(1200, 16)
+	_intent_label.size = Vector2(260, 38)
+	_intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_intent_label)
 
 func _apply_theme():
 	var tm = UIThemeManager
@@ -161,6 +179,12 @@ func _apply_theme():
 		_challenge_label.add_theme_color_override("font_shadow_color", tm.color("shadow_color"))
 		_challenge_label.add_theme_constant_override("shadow_offset_x", 1)
 		_challenge_label.add_theme_constant_override("shadow_offset_y", 1)
+	if _intent_label:
+		_intent_label.add_theme_font_size_override("font_size", 16)
+		_intent_label.add_theme_color_override("font_color", tm.color("text_danger"))
+		_intent_label.add_theme_color_override("font_shadow_color", tm.color("shadow_color"))
+		_intent_label.add_theme_constant_override("shadow_offset_x", 1)
+		_intent_label.add_theme_constant_override("shadow_offset_y", 1)
 	player_hp_label.add_theme_font_size_override("font_size", 22)
 	player_hp_label.add_theme_color_override("font_color", tm.color("player_hp_text"))
 	player_hp_label.add_theme_color_override("font_shadow_color", tm.color("shadow_color"))
@@ -215,10 +239,25 @@ func _apply_hud_pattern():
 func _process(delta):
 	floor_label.text     = "🏰 第 %d 层" % GameManager.floor_number
 	clicks_label.text    = "👆 探索: %d" % GameManager.current_clicks
+	clicks_label.add_theme_color_override(
+		"font_color",
+		UIThemeManager.color("text_danger") if GameManager.current_clicks <= 1 else UIThemeManager.color("text_secondary")
+	)
 	if _intel_label:
 		_intel_label.text = "🧠 %d  🔁 %d" % [GameManager.intel_points, GameManager.reroll_tokens]
 	if _challenge_label:
-		_challenge_label.text = "挑战：%s" % GameManager.challenge_modifier
+		var danger_msg = ""
+		if BossGrid.has_alive_at_left_edge():
+			danger_msg = "  |  危险：Boss已贴近"
+		elif GameManager.turn_timer < 5.0 and GameManager.timer_running:
+			danger_msg = "  |  危险：回合即将结束"
+		_challenge_label.text = "挑战：%s%s" % [GameManager.challenge_modifier, danger_msg]
+	if _intent_label:
+		var intent = BossGrid.next_attack_intent
+		var icon = BossGrid.attack_type_icon(intent)
+		var name = BossGrid.attack_type_name(intent)
+		_intent_label.text = "预告: %s %s" % [icon, name]
+		_intent_label.add_theme_color_override("font_color", _intent_color(intent))
 
 	boss_hp_bar.max_value = max(GameManager.boss_max_hp, 1)
 	_display_boss_hp = lerp(_display_boss_hp, float(GameManager.boss_hp), delta * 8.0)
@@ -242,10 +281,48 @@ func _process(delta):
 		timer_label.add_theme_color_override("font_color",
 			UIThemeManager.color("text_danger") if warn else UIThemeManager.color("text_primary"))
 
+	# 倒计时紧迫：最后5秒timer缩放脉冲
+	if warn and t < 5.0 and GameManager.timer_running:
+		var beat = 1.0 + 0.08 * abs(sin(Time.get_ticks_msec() * 0.012))
+		timer_label.scale = Vector2(beat, beat)
+		if _intent_label:
+			_intent_label.text = "%s  ·  即将行动" % _intent_label.text
+	else:
+		timer_label.scale = Vector2.ONE
+
 	var t_int = int(t)
 	if warn and t_int != _last_timer_int:
 		_last_timer_int = t_int
 		AudioManager.play_sfx("timer_warn")
+
+	# 低HP红色边缘渐变（血量<=30%时）
+	var hp_ratio = float(GameManager.player_hp) / max(GameManager.player_max_hp, 1)
+	if hp_ratio <= 0.3 and GameManager.player_hp > 0:
+		var hp_pulse = 1.0 + 0.06 * abs(sin(Time.get_ticks_msec() * 0.01))
+		player_hp_label.scale = Vector2(hp_pulse, hp_pulse)
+	else:
+		player_hp_label.scale = Vector2.ONE
+	if hp_ratio <= 0.3 and GameManager.player_hp > 0:
+		var intensity = (1.0 - hp_ratio / 0.3) * 0.15
+		var flash = intensity * (0.7 + 0.3 * abs(sin(Time.get_ticks_msec() * 0.004)))
+		_vignette_alpha = lerp(_vignette_alpha, flash, min(1.0, delta * 8.0))
+		_vignette.color = Color(0.8, 0.0, 0.0, _vignette_alpha)
+	else:
+		_vignette_alpha = lerp(_vignette_alpha, 0.0, min(1.0, delta * 8.0))
+		_vignette.color = Color(0.8, 0.0, 0.0, _vignette_alpha)
+
+func _intent_color(intent: int) -> Color:
+	match intent:
+		BossGrid.AttackType.NORMAL:
+			return UIThemeManager.color("text_secondary")
+		BossGrid.AttackType.STRAFE:
+			return Color(0.70, 0.85, 1.0)
+		BossGrid.AttackType.BURROW:
+			return Color(0.95, 0.75, 0.35)
+		BossGrid.AttackType.SLAM, BossGrid.AttackType.CHARGE, BossGrid.AttackType.WIDE_SWIPE, BossGrid.AttackType.BOMBARD:
+			return UIThemeManager.color("text_danger")
+		_:
+			return UIThemeManager.color("text_primary")
 
 func _flash_hp_label():
 	var tween = create_tween()

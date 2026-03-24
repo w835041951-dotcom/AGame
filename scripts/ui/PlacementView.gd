@@ -343,16 +343,18 @@ func _show_danger_overlay(dist: int):
 		_danger_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_danger_overlay.size = Vector2(BossGrid.placement_cols * cell_size, BossGrid.placement_rows * cell_size)
 		add_child(_danger_overlay)
-	# 越近越红越不透明
+	# 越近越红越不透明 + 左侧红色条警示
 	var intensity = (4.0 - dist) / 4.0  # 0.25 ~ 1.0
-	_danger_overlay.color = Color(1.0, 0.0, 0.0, 0.03 + intensity * 0.08)
+	_danger_overlay.color = Color(1.0, 0.0, 0.0, 0.04 + intensity * 0.10)
 
 	if _danger_tween and _danger_tween.is_valid():
 		return  # 已在脉冲中
 	_danger_tween = create_tween().set_loops()
 	var base_a = _danger_overlay.color.a
-	_danger_tween.tween_property(_danger_overlay, "color:a", base_a + 0.06, 0.6)
-	_danger_tween.tween_property(_danger_overlay, "color:a", base_a, 0.6)
+	var pulse_a = base_a + 0.06 + intensity * 0.04
+	var speed = lerpf(0.8, 0.35, intensity)
+	_danger_tween.tween_property(_danger_overlay, "color:a", pulse_a, speed)
+	_danger_tween.tween_property(_danger_overlay, "color:a", base_a, speed)
 
 func _hide_danger_overlay():
 	if _danger_tween and _danger_tween.is_valid():

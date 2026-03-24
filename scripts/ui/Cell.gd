@@ -76,6 +76,8 @@ func setup(x: int, y: int, m: Mode, sz: int = 64):
 	add_theme_font_size_override("font_size", max(14, cell_size * 0.38))
 	set_display_state(DisplayState.MINE_HIDDEN if mode == Mode.MINE else DisplayState.EMPTY)
 	pressed.connect(_on_pressed)
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
 
 func _gui_input(event: InputEvent):
 	if mode != Mode.MINE:
@@ -92,6 +94,16 @@ func _on_pressed():
 	else:
 		GridManager.reveal_cell(grid_x, grid_y, Input.is_key_pressed(KEY_SHIFT))
 
+func _on_mouse_entered():
+	_hovered = true
+	if _hp_ratio >= 0.0:
+		queue_redraw()
+
+func _on_mouse_exited():
+	_hovered = false
+	if _hp_ratio >= 0.0:
+		queue_redraw()
+
 func _update_mark_display():
 	if _marked_safe:
 		text = "○"
@@ -107,6 +119,7 @@ func _update_mark_display():
 		add_theme_font_size_override("font_size", max(14, cell_size * 0.38))
 
 var _hp_ratio: float = -1.0  # -1 = 不显示HP条
+var _hovered: bool = false    # 鼠标悬停时才显示HP条
 
 func set_display_state(state: DisplayState, extra: Dictionary = {}):
 	_current_state = state
@@ -141,7 +154,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			tooltip_text = "%s  Lv.%d\n范围: %s" % [info.get("name", ""), lvl, range_desc]
 
 		DisplayState.BLOCKED:
-			_apply_tex_or_flat("blocked", tm.color("blocked_bg"), tm.color("text_danger").darkened(0.35), 1)
+			_apply_tex_or_flat("blocked", tm.color("blocked_bg"), (tm.color("text_danger") as Color).darkened(0.35), 1)
 			text = "✕"
 			add_theme_color_override("font_color", tm.color("text_danger"))
 			disabled = true
@@ -172,7 +185,12 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 			_flash_explode()
 
 		DisplayState.MINE_HIDDEN:
-			_apply_tex_or_flat("mine_hidden", tm.color("mine_hidden"), tm.color("mine_hidden_brd"), 1)
+			_apply_tex_or_flat("mine_hidden", tm.color("mine_hidden"), tm.color("mine_hidden_brd"), 2)
+			text = "?"
+			add_theme_color_override("font_color", (tm.color("mine_hidden_brd") as Color).lightened(0.2))
+			add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+			add_theme_constant_override("shadow_offset_x", 1)
+			add_theme_constant_override("shadow_offset_y", 1)
 
 		DisplayState.MINE_REVEALED:
 			_apply_tex_or_flat("mine_reveal", tm.color("mine_reveal"), tm.color("mine_reveal_brd"), 0)
@@ -231,7 +249,7 @@ func set_display_state(state: DisplayState, extra: Dictionary = {}):
 		queue_redraw()
 
 func _draw():
-	if _hp_ratio < 0.0 or _hp_ratio > 1.0:
+	if not _hovered or _hp_ratio < 0.0 or _hp_ratio > 1.0:
 		return
 	var bar_h = max(8, cell_size / 7)
 	var bar_y = cell_size - bar_h - 1
@@ -323,22 +341,33 @@ func _flash_explode():
 func animate_explosion_hit(delay: float = 0.0):
 	if _current_state == DisplayState.BOSS_DEAD:
 		return
+	pivot_offset = size / 2
 	var tween = create_tween()
 	if delay > 0.0:
 		tween.tween_interval(delay)
-	tween.tween_property(self, "modulate", Color(3.0, 2.5, 0.5), 0.06)
-	tween.tween_property(self, "modulate", Color.WHITE, 0.4)
+	# Flash white-yellow then punch scale
+	tween.tween_property(self, "modulate", Color(3.0, 2.5, 0.5), 0.04)
+	tween.parallel().tween_property(self, "scale", Vector2(1.15, 1.15), 0.04)
+	tween.tween_property(self, "scale", Vector2(0.92, 0.92), 0.06).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(self, "modulate", Color.WHITE, 0.35)
 
 func animate_placement():
 	pivot_offset = size / 2
 	scale = Vector2(0.5, 0.5)
+	modulate = Color(1.5, 1.5, 0.8)
 	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(self, "scale", Vector2.ONE, 0.2)
+	tween.tween_property(self, "scale", Vector2(1.08, 1.08), 0.12)
+	tween.parallel().tween_property(self, "modulate", Color.WHITE, 0.15)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.08)
 
 func animate_destruction():
 	pivot_offset = size / 2
-	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_property(self, "scale", Vector2(0.6, 0.6), 0.3)
+	var tween = create_tween()
+	tween.tween_property(self, "modulate", Color(1.5, 0.5, 0.3), 0.06)
+	tween.parallel().tween_property(self, "scale", Vector2(1.1, 1.1), 0.06)
+	tween.tween_property(self, "scale", Vector2(0.5, 0.5), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.parallel().tween_property(self, "modulate", Color(0.5, 0.2, 0.1, 0.5), 0.2)
 
 func animate_boss_death(delay: float = 0.0):
 	pivot_offset = size / 2
@@ -362,8 +391,11 @@ func animate_boss_death(delay: float = 0.0):
 func animate_reveal():
 	pivot_offset = size / 2
 	scale = Vector2(0.0, 0.0)
+	rotation = -0.15
 	var tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(self, "scale", Vector2.ONE, 0.15)
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", Vector2.ONE, 0.2)
+	tween.tween_property(self, "rotation", 0.0, 0.2)
 
 func animate_magic_reveal():
 	pivot_offset = size / 2

@@ -24,6 +24,8 @@ var _ver_lbl: Label = null
 var _hint_lbl: Label = null
 var _press_any_key: bool = true
 var _press_overlay: Control = null
+var _press_pulse_tween: Tween = null
+var _settings_hint_lbl: Label = null
 
 func _ready():
 	_setup_scene()
@@ -44,7 +46,7 @@ func _show_press_any_key():
 		_overlay.color.a = 0.45
 
 	_press_overlay = Label.new()
-	_press_overlay.text = "—  按任意键继续  —"
+	_press_overlay.text = "—  按任意键 / 手柄A键继续  —"
 	_press_overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_press_overlay.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_press_overlay.position = Vector2(0, 680)
@@ -54,22 +56,26 @@ func _show_press_any_key():
 	add_child(_press_overlay)
 
 	# 闪烁动画
-	var pulse = create_tween().set_loops()
-	pulse.tween_property(_press_overlay, "modulate:a", 0.3, 1.0)
-	pulse.tween_property(_press_overlay, "modulate:a", 1.0, 1.0)
+	_press_pulse_tween = create_tween().set_loops()
+	_press_pulse_tween.tween_property(_press_overlay, "modulate:a", 0.3, 1.0)
+	_press_pulse_tween.tween_property(_press_overlay, "modulate:a", 1.0, 1.0)
 
 	var tw = create_tween()
 	tw.tween_property(self, "modulate:a", 1.0, 0.8)
 
 func _animate_in():
 	_press_any_key = false
+	if _press_pulse_tween and _press_pulse_tween.is_valid():
+		_press_pulse_tween.kill()
+		_press_pulse_tween = null
 	if _press_overlay:
 		_press_overlay.queue_free()
 		_press_overlay = null
 	# 恢复遮罩浓度
 	if _overlay:
+		var target_a = (UIThemeManager.color("intro_overlay") as Color).a
 		var tw_ov = create_tween()
-		tw_ov.tween_property(_overlay, "color:a", UIThemeManager.color("intro_overlay").a, 0.4)
+		tw_ov.tween_property(_overlay, "color:a", target_a, 0.4)
 	# 显示菜单等元素
 	if _menu_vbox:
 		var tw1 = create_tween()
@@ -130,6 +136,27 @@ func _setup_scene():
 	_sub_lbl.add_theme_constant_override("shadow_offset_y", 2)
 	add_child(_sub_lbl)
 
+	# ── 最佳记录 ──
+	var best_floor = AchievementManager.stats.get("max_floor", 0)
+	var total_runs = AchievementManager.stats.get("total_runs", 0)
+	var unlocked = 0
+	for aid in AchievementManager.ACHIEVEMENTS:
+		if AchievementManager.unlocked.has(aid):
+			unlocked += 1
+	if total_runs > 0:
+		var records_lbl = Label.new()
+		records_lbl.text = "🏆 最高层: %d  |  🎮 游玩次数: %d  |  ⭐ 成就: %d/%d" % [best_floor, total_runs, unlocked, AchievementManager.ACHIEVEMENTS.size()]
+		records_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		records_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		records_lbl.position = Vector2(0, 268)
+		records_lbl.size = Vector2(1920, 36)
+		records_lbl.add_theme_font_size_override("font_size", 18)
+		records_lbl.add_theme_color_override("font_color", Color(0.85, 0.78, 0.55, 0.8))
+		records_lbl.add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
+		records_lbl.add_theme_constant_override("shadow_offset_x", 1)
+		records_lbl.add_theme_constant_override("shadow_offset_y", 1)
+		add_child(records_lbl)
+
 	# ── 菜单容器 ──
 	_menu_vbox = VBoxContainer.new()
 	_menu_vbox.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -141,7 +168,7 @@ func _setup_scene():
 	var items_def = [
 		{"id": "story",    "label": "▶  观看故事",  "enabled": true},
 		{"id": "new_game", "label": "⚔  新游戏",    "enabled": true},
-		{"id": "continue", "label": "◎  继续游戏",  "enabled": _has_save},
+		{"id": "continue", "label": "◎  继续游戏" if _has_save else "◎  继续游戏 (无存档)",  "enabled": _has_save},
 		{"id": "settings", "label": "⚙  设置",      "enabled": true},
 		{"id": "quit",     "label": "✕  退出",      "enabled": true},
 	]
@@ -155,7 +182,7 @@ func _setup_scene():
 		_menu_vbox.add_child(btn)
 		_menu_items.append(btn)
 
-	_update_selection(0)
+	_update_selection(_default_menu_index())
 
 	# ── 版权/版本 ──
 	_ver_lbl = Label.new()
@@ -165,12 +192,12 @@ func _setup_scene():
 	_ver_lbl.size = Vector2(1920, 28)
 	_ver_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ver_lbl.add_theme_font_size_override("font_size", 14)
-	_ver_lbl.add_theme_color_override("font_color", UIThemeManager.color("text_secondary").darkened(0.4))
+	_ver_lbl.add_theme_color_override("font_color", (UIThemeManager.color("text_secondary") as Color).darkened(0.4))
 	add_child(_ver_lbl)
 
 	# ── 操作提示 ──
 	_hint_lbl = Label.new()
-	_hint_lbl.text = "↑↓ 选择    ENTER / 点击 确认"
+	_hint_lbl.text = "↑↓ 选择  ENTER确认  ESC退出  手柄: ↑↓/A/B"
 	_hint_lbl.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_hint_lbl.position = Vector2(0, 1080 - 68)
 	_hint_lbl.size = Vector2(1920, 28)
@@ -186,6 +213,15 @@ func _setup_scene():
 
 	UIThemeManager.theme_changed.connect(func(_n): _apply_theme())
 
+func _default_menu_index() -> int:
+	for i in range(_menu_items.size()):
+		if _menu_items[i].get_meta("item_id") == "new_game" and not _menu_items[i].disabled:
+			return i
+	for i in range(_menu_items.size()):
+		if not _menu_items[i].disabled:
+			return i
+	return 0
+
 # ─── 主题实时刷新 ────────────────────────────────────────────
 
 func _apply_theme():
@@ -197,7 +233,7 @@ func _apply_theme():
 	if _overlay:
 		_overlay.color = tm.color("intro_overlay")
 	if _ver_lbl:
-		_ver_lbl.add_theme_color_override("font_color", tm.color("text_secondary").darkened(0.4))
+		_ver_lbl.add_theme_color_override("font_color", (tm.color("text_secondary") as Color).darkened(0.4))
 	if _hint_lbl:
 		_hint_lbl.add_theme_color_override("font_color", tm.color("text_secondary"))
 	# 刷新菜单按钮颜色
@@ -207,7 +243,7 @@ func _apply_theme():
 		btn.add_theme_stylebox_override("normal", sn)
 		btn.add_theme_stylebox_override("disabled", sn)
 		btn.add_theme_color_override("font_color", tm.color("text_primary"))
-		btn.add_theme_color_override("font_disabled_color", tm.color("text_secondary").darkened(0.4))
+		btn.add_theme_color_override("font_disabled_color", (tm.color("text_secondary") as Color).darkened(0.4))
 		var sh = tm.make_themed_stylebox("btn_hover", "btn_hover_bg", "border_strong")
 		btn.add_theme_stylebox_override("hover", sh)
 		btn.add_theme_stylebox_override("pressed", sh)
@@ -254,6 +290,10 @@ func _open_settings():
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.color = Color(0, 0, 0, 0.7)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.gui_input.connect(func(event):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_close_settings()
+	)
 	_settings_panel.add_child(dim)
 
 	# 主面板
@@ -653,9 +693,14 @@ func _open_settings():
 	reset_btn.add_theme_stylebox_override("pressed", UIThemeManager.make_themed_stylebox("btn_hover", "btn_hover_bg", "border_strong"))
 	reset_btn.add_theme_color_override("font_color", UIThemeManager.color("text_primary"))
 	reset_btn.pressed.connect(func():
+		GameSettings.set_resolution(2)
+		GameSettings.set_fullscreen(false)
+		GameSettings.set_fps(1)
+		GameSettings.set_vsync(true)
 		GameSettings.set_difficulty(1)
 		GameSettings.set_music_volume(0.7)
 		GameSettings.set_sfx_volume(1.0)
+		_selected_floor = 1
 		_close_settings()
 		_open_settings()
 	)
@@ -673,6 +718,15 @@ func _open_settings():
 	back_btn.pressed.connect(_close_settings)
 	panel.add_child(back_btn)
 
+	_settings_hint_lbl = Label.new()
+	_settings_hint_lbl.text = "ESC / 手柄B / 点击遮罩 关闭"
+	_settings_hint_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_settings_hint_lbl.position = Vector2(820, 872)
+	_settings_hint_lbl.size = Vector2(320, 36)
+	_settings_hint_lbl.add_theme_font_size_override("font_size", 16)
+	_settings_hint_lbl.add_theme_color_override("font_color", UIThemeManager.color("text_secondary"))
+	panel.add_child(_settings_hint_lbl)
+
 	# 淡入
 	_settings_panel.modulate = Color(1, 1, 1, 0)
 	var tw = create_tween()
@@ -681,6 +735,7 @@ func _open_settings():
 func _close_settings():
 	if not _settings_panel:
 		return
+	_settings_hint_lbl = null
 	_settings_panel.queue_free()
 	_settings_panel = null
 	_can_input = true
@@ -758,7 +813,7 @@ func _make_menu_btn(label_text: String) -> Button:
 	btn.add_theme_stylebox_override("normal",   sn)
 	btn.add_theme_stylebox_override("disabled", sn)
 	btn.add_theme_color_override("font_color",          tm.color("text_primary"))
-	btn.add_theme_color_override("font_disabled_color", tm.color("text_secondary").darkened(0.4))
+	btn.add_theme_color_override("font_disabled_color", (tm.color("text_secondary") as Color).darkened(0.4))
 	btn.add_theme_color_override("font_shadow_color", UIThemeManager.color("shadow_color"))
 	btn.add_theme_constant_override("shadow_offset_x", 2)
 	btn.add_theme_constant_override("shadow_offset_y", 2)
@@ -797,11 +852,14 @@ func _start_bg_animation(title_lbl: Label):
 func _input(event):
 	# 按任意键阶段
 	if _press_any_key:
-		if (event is InputEventKey or event is InputEventMouseButton) and event.pressed:
+		if (event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton) and event.pressed:
 			_animate_in()
 		return
 	# 设置面板打开时，ESC关闭它
 	if _settings_panel:
+		if event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_B:
+			_close_settings()
+			return
 		if event is InputEventKey and event.pressed and not event.echo:
 			if event.keycode == KEY_ESCAPE:
 				_close_settings()
@@ -817,6 +875,16 @@ func _input(event):
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				_activate_selected()
 			KEY_ESCAPE:
+				_on_menu_selected("quit")
+	if event is InputEventJoypadButton and event.pressed:
+		match event.button_index:
+			JOY_BUTTON_DPAD_UP:
+				_move_selection(-1)
+			JOY_BUTTON_DPAD_DOWN:
+				_move_selection(1)
+			JOY_BUTTON_A:
+				_activate_selected()
+			JOY_BUTTON_B:
 				_on_menu_selected("quit")
 
 func _move_selection(dir: int):

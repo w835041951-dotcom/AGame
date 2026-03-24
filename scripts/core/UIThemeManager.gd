@@ -83,10 +83,10 @@ const PALETTES = {
 		"btn_end_text":    Color(1.0, 0.80, 0.90),
 		"explode_bg":      Color(1.0, 0.50, 0.65),
 		"explode_brd":     Color(1.0, 0.75, 0.85),
-		"mine_hidden":     Color(0.18, 0.12, 0.22),
-		"mine_hidden_brd": Color(0.38, 0.25, 0.40),
-		"mine_reveal":     Color(0.08, 0.05, 0.10),
-		"mine_reveal_brd": Color(0.16, 0.10, 0.18),
+		"mine_hidden":     Color(0.30, 0.20, 0.38),
+		"mine_hidden_brd": Color(0.55, 0.35, 0.60),
+		"mine_reveal":     Color(0.06, 0.04, 0.08),
+		"mine_reveal_brd": Color(0.12, 0.08, 0.14),
 		"boss_weak_brd":   Color(1.0, 0.85, 0.40),
 		"boss_armor_brd":  Color(0.50, 0.55, 1.0),
 		"boss_absorb_brd": Color(0.40, 0.90, 0.60),
@@ -145,10 +145,10 @@ const PALETTES = {
 		"btn_end_text":    Color(1.0, 0.85, 0.40),
 		"explode_bg":      Color(1.0, 0.55, 0.15),
 		"explode_brd":     Color(1.0, 0.78, 0.25),
-		"mine_hidden":     Color(0.20, 0.16, 0.10),
-		"mine_hidden_brd": Color(0.40, 0.32, 0.20),
-		"mine_reveal":     Color(0.09, 0.07, 0.04),
-		"mine_reveal_brd": Color(0.18, 0.14, 0.08),
+		"mine_hidden":     Color(0.32, 0.25, 0.14),
+		"mine_hidden_brd": Color(0.55, 0.42, 0.22),
+		"mine_reveal":     Color(0.06, 0.05, 0.03),
+		"mine_reveal_brd": Color(0.14, 0.11, 0.06),
 		"boss_weak_brd":   Color(1.0, 0.88, 0.25),
 		"boss_armor_brd":  Color(0.45, 0.55, 0.90),
 		"boss_absorb_brd": Color(0.30, 0.85, 0.40),
@@ -207,10 +207,10 @@ const PALETTES = {
 		"btn_end_text":    Color(0.0, 1.0, 0.90),
 		"explode_bg":      Color(1.0, 0.15, 0.60),
 		"explode_brd":     Color(0.0, 1.0, 1.0),
-		"mine_hidden":     Color(0.10, 0.06, 0.22),
-		"mine_hidden_brd": Color(0.22, 0.12, 0.45),
-		"mine_reveal":     Color(0.03, 0.02, 0.08),
-		"mine_reveal_brd": Color(0.08, 0.04, 0.16),
+		"mine_hidden":     Color(0.16, 0.10, 0.35),
+		"mine_hidden_brd": Color(0.35, 0.20, 0.65),
+		"mine_reveal":     Color(0.03, 0.02, 0.06),
+		"mine_reveal_brd": Color(0.08, 0.04, 0.12),
 		"boss_weak_brd":   Color(0.0, 1.0, 0.85),
 		"boss_armor_brd":  Color(0.40, 0.30, 1.0),
 		"boss_absorb_brd": Color(1.0, 0.15, 0.60),
@@ -293,12 +293,12 @@ const THEME_FOLDER = {
 }
 var _pattern_cache: Dictionary = {}
 
-func get_pattern(name: String) -> Texture2D:
+func get_pattern(pat_name: String) -> Texture2D:
 	var folder = THEME_FOLDER[current_theme]
-	var key = "%s/%s" % [folder, name]
+	var key = "%s/%s" % [folder, pat_name]
 	if _pattern_cache.has(key):
 		return _pattern_cache[key]
-	var path = "res://assets/sprites/ui/patterns/%s/%s.png" % [folder, name]
+	var path = "res://assets/sprites/ui/patterns/%s/%s.png" % [folder, pat_name]
 	var tex: Texture2D = null
 	if ResourceLoader.exists(path):
 		tex = load(path) as Texture2D
@@ -308,20 +308,20 @@ func get_pattern(name: String) -> Texture2D:
 # ── 主题素材 (themed sprites) ──
 var _themed_cache: Dictionary = {}
 
-func get_themed(name: String) -> Texture2D:
+func get_themed(tex_name: String) -> Texture2D:
 	var folder = THEME_FOLDER[current_theme]
-	var key = "%s/%s" % [folder, name]
+	var key = "%s/%s" % [folder, tex_name]
 	if _themed_cache.has(key):
 		return _themed_cache[key]
-	var path = "res://assets/sprites/ui/themed/%s/%s.png" % [folder, name]
+	var path = "res://assets/sprites/ui/themed/%s/%s.png" % [folder, tex_name]
 	var tex: Texture2D = null
 	if ResourceLoader.exists(path):
 		tex = load(path) as Texture2D
-	_themed_cache[key] = tex
+	_themed_cache[key] = tex  # get_themed
 	return tex
 
-func make_themed_stylebox(name: String, fallback_bg: String = "", fallback_brd: String = "") -> StyleBox:
-	var tex = get_themed(name)
+func make_themed_stylebox(style_name: String, fallback_bg: String = "", fallback_brd: String = "") -> StyleBox:
+	var tex = get_themed(style_name)
 	if tex:
 		var s = StyleBoxTexture.new()
 		s.texture = tex

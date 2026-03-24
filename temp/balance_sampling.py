@@ -2,7 +2,8 @@ import json
 import math
 import random
 import re
-from dataclasses import dataclass, asdict
+import statistics
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -14,6 +15,7 @@ GRID_MANAGER_PATH = ROOT / "scripts" / "core" / "GridManager.gd"
 BOSS_GRID_PATH = ROOT / "scripts" / "boss" / "BossGrid.gd"
 EXP_CALC_PATH = ROOT / "scripts" / "boss" / "ExplosionCalc.gd"
 UPGRADE_MANAGER_PATH = ROOT / "scripts" / "core" / "UpgradeManager.gd"
+GAME_SETTINGS_PATH = ROOT / "scripts" / "core" / "GameSettings.gd"
 
 
 @dataclass
@@ -27,6 +29,7 @@ class RunResult:
     avg_click_delta_per_turn: float
     avg_intel_delta_per_turn: float
     ending_hp: int
+    death_reason: str = "unknown"  # "win", "hp_depleted", "timeout", "no_damage"
 
 
 def read_text(path: Path) -> str:
@@ -168,6 +171,21 @@ def parse_balance_constants() -> Dict[str, float]:
     return c
 
 
+def parse_default_settings() -> Dict[str, float]:
+    text = read_text(GAME_SETTINGS_PATH)
+    out: Dict[str, float] = {
+        "mine_difficulty": 1.0,
+        "boss_hp_mult": 1.0,
+    }
+    m = re.search(r"var mine_difficulty:\s*float\s*=\s*([0-9.]+)", text)
+    if m:
+        out["mine_difficulty"] = float(m.group(1))
+    m = re.search(r"var boss_hp_mult:\s*float\s*=\s*([0-9.]+)", text)
+    if m:
+        out["boss_hp_mult"] = float(m.group(1))
+    return out
+
+
 def calc_damage(base: int, affixes: set) -> int:
     dmg = base
     if "overload" in affixes:
@@ -198,6 +216,7 @@ def run_once(
     grid_sizes: Dict[str, Tuple[int, int]],
     bomb_damage: Dict[str, int],
     c: Dict[str, float],
+    settings: Dict[str, float],
 ) -> RunResult:
     rng = random.Random(seed)
 
@@ -220,21 +239,26 @@ def run_once(
         level = levels[(floor - 1) % len(levels)]
         cycle = (floor - 1) // len(levels)
 
-        hp_mult = (1.0 + cycle * 0.5)
+        mine_mult = max(0.3, settings.get("mine_difficulty", 1.0))
+        boss_mult = max(0.3, settings.get("boss_hp_mult", 1.0))
+
+        hp_mult = (1.0 + cycle * 0.5) * boss_mult
         shape = level["boss_shape"]
         w, h = grid_sizes[shape]
-        boss_hp = int(w * h * 10 * hp_mult)
+        boss_hp = int(110 * hp_mult)
 
-        mine_cols = level["mine_cols"] + cycle
+        mine_cols = int(round((level["mine_cols"] + cycle) * (0.9 + 0.1 * mine_mult)))
         mine_rows = level["mine_rows"]
-        base_bomb = level["bomb_count"] + cycle * 2
+        base_bomb = int(round((level["bomb_count"] + cycle * 2) * (0.85 + 0.15 * mine_mult)))
         bomb_count = max(base_bomb, 2)
         total_cells = mine_cols * mine_rows
         bomb_hidden = min(bomb_count, total_cells - 1)
         nonbomb_hidden = total_cells - bomb_hidden
 
-        max_clicks = level["base_clicks"] + cycle * 3
+        max_clicks = int(round((level["base_clicks"] + cycle * 3) / max(0.6, 0.8 + 0.2 * mine_mult)))
         boss_attack = level["boss_attack"] + cycle * 3
+        turn_duration = float(level["turn_duration"])
+        boss_move_interval = float(level["boss_move_interval"])
 
         # special pool counts
         supply_left = max(1, int(nonbomb_hidden * c["supply_rate"]))
@@ -250,6 +274,7 @@ def run_once(
         floor_click_spend = 0
         floor_intel_gain = 0
         floor_intel_spend = 0
+        intel_pool = 0
 
         while boss_hp > 0 and hp > 0 and floor_turns < 80:
             floor_turns += 1
@@ -318,9 +343,11 @@ def run_once(
                                 clicks += 1
                                 floor_click_gain += 1
                                 floor_intel_gain += 1
+                                intel_pool += 1
                             elif pick <= supply_left + relic_left:
                                 relic_left -= 1
                                 floor_intel_gain += 2
+                                intel_pool += 2
                                 # reroll token omitted from combat math, not direct DPS
                                 if unlocked and rng.random() < c["relic_affix_p"]:
                                     target = rng.choice(unlocked)
@@ -336,6 +363,15 @@ def run_once(
                                 risk_left -= 1
                                 clicks = max(i, clicks - 1)
                                 floor_intel_gain += 1
+                                intel_pool += 1
+
+                # lightweight intel economy: convert excess intel into tactical sustain
+                if intel_pool >= 2 and len(inventory) <= 1 and rng.random() < 0.4:
+                    intel_pool -= 2
+                    floor_intel_spend += 2
+                    extra = rng.choice(unlocked)
+                    if extra != "ultimate" or inventory.get(extra, 0) == 0:
+                        inventory[extra] = inventory.get(extra, 0) + 1
 
             # choose bombs to use this turn (up to 7 practical placements)
             usable: List[str] = []
@@ -354,7 +390,8 @@ def run_once(
 
             # prioritize stronger bombs
             usable.sort(key=lambda t: calc_damage(bomb_damage[t], affixes[t]), reverse=True)
-            used = usable[:7]
+            placement_cap = max(3, int((level["placement_cols"] + cycle) * level["placement_rows"] * 0.16))
+            used = usable[:min(7, placement_cap)]
             used_counts: Dict[str, int] = {}
             for t in used:
                 used_counts[t] = used_counts.get(t, 0) + 1
@@ -371,7 +408,7 @@ def run_once(
 
             # approximate phase-dependent shield/pollution factors
             # phase thresholds 70% / 35%
-            hp_ratio = boss_hp / max(1.0, float(int(w * h * 10 * hp_mult)))
+            hp_ratio = boss_hp / max(1.0, float(int(110 * hp_mult)))
             phase = 1
             if hp_ratio <= 0.35:
                 phase = 3
@@ -433,7 +470,9 @@ def run_once(
 
             # incoming damage pressure this turn (reduced if freeze-like utility present)
             freeze_used = "freeze_bomb" in used
-            pressure = 0.14 + 0.02 * max(0, phase - 1)
+            pace_factor = max(0.8, min(1.3, 50.0 / max(20.0, turn_duration)))
+            move_factor = max(0.85, min(1.25, 65.0 / max(25.0, boss_move_interval)))
+            pressure = (0.14 + 0.02 * max(0, phase - 1)) * pace_factor * move_factor
             if phase == 2 and rng.random() < c["summon_p2"]:
                 pressure += 0.03
             if phase == 3 and rng.random() < c["summon_p3"]:
@@ -448,8 +487,8 @@ def run_once(
         intel_delta_total += (floor_intel_gain - floor_intel_spend)
 
         if boss_hp <= 0 and hp > 0:
-            # discovery bonus (all bombs found can happen before clear); simplified sustain
-            hp = min(30, hp + 2)
+            # guaranteed floor-clear heal (must stay in sync with GameManager.next_floor)
+            hp = min(30, hp + (4 if floor + 1 <= 5 else 3))
             # emulate one permanent upgrade pick from random 3
             pool = [
                 "bomb_range_up",
@@ -496,6 +535,16 @@ def run_once(
     avg_click_delta = (clicks_delta_total / turns_total) if turns_total else 0.0
     avg_intel_delta = (intel_delta_total / turns_total) if turns_total else 0.0
 
+    # determine why the run ended
+    if floor > 200:
+        death_reason = "win"
+    elif hp <= 0:
+        death_reason = "hp_depleted"
+    elif turns_total > 0 and avg_turn_damage == 0.0:
+        death_reason = "no_damage"
+    else:
+        death_reason = "timeout"
+
     return RunResult(
         run_id=run_id,
         seed=seed,
@@ -506,29 +555,61 @@ def run_once(
         avg_click_delta_per_turn=avg_click_delta,
         avg_intel_delta_per_turn=avg_intel_delta,
         ending_hp=max(0, hp),
+        death_reason=death_reason,
     )
 
 
-def summarize(results: List[RunResult]) -> Dict[str, float]:
+def summarize(results: List[RunResult]) -> Dict:
     n = len(results)
     def mean(vals: List[float]) -> float:
         return sum(vals) / n if n else 0.0
+    def stdev(vals: List[float]) -> float:
+        return statistics.stdev(vals) if len(vals) >= 2 else 0.0
+    def pct(vals: List[float], p: int) -> float:
+        if not vals: return 0.0
+        s = sorted(vals)
+        idx = (len(s) - 1) * p / 100
+        lo = int(idx)
+        hi = min(lo + 1, len(s) - 1)
+        return s[lo] + (s[hi] - s[lo]) * (idx - lo)
 
     floors = [r.floors_cleared for r in results]
     turns = [r.turns for r in results]
     dmg = [r.avg_turn_damage for r in results]
     click_delta = [r.avg_click_delta_per_turn for r in results]
     intel_delta = [r.avg_intel_delta_per_turn for r in results]
+    ending_hps = [r.ending_hp for r in results]
+
+    # floor tier distribution
+    tiers = {"0-5": 0, "6-20": 0, "21-50": 0, "51-100": 0, "101+": 0}
+    for f in floors:
+        if f <= 5: tiers["0-5"] += 1
+        elif f <= 20: tiers["6-20"] += 1
+        elif f <= 50: tiers["21-50"] += 1
+        elif f <= 100: tiers["51-100"] += 1
+        else: tiers["101+"] += 1
+
+    death_counts: Dict[str, int] = {}
+    for r in results:
+        death_counts[r.death_reason] = death_counts.get(r.death_reason, 0) + 1
 
     return {
         "runs": n,
         "avg_floors_cleared": mean(floors),
         "min_floors_cleared": min(floors) if floors else 0,
         "max_floors_cleared": max(floors) if floors else 0,
+        "stddev_floors_cleared": stdev(floors),
+        "p25_floors_cleared": pct(floors, 25),
+        "p50_floors_cleared": pct(floors, 50),
+        "p75_floors_cleared": pct(floors, 75),
         "avg_turns": mean(turns),
         "avg_turn_damage": mean(dmg),
         "avg_click_delta_per_turn": mean(click_delta),
         "avg_intel_delta_per_turn": mean(intel_delta),
+        "avg_ending_hp": mean(ending_hps),
+        "win_count": sum(1 for r in results if r.death_reason == "win"),
+        "floor_tiers": tiers,
+        "death_reasons": death_counts,
     }
 
 
@@ -540,13 +621,14 @@ def main() -> None:
     levels = parse_level_blocks(level_text)
     base_bomb_damage = parse_bomb_damage_map(bomb_text)
     constants = parse_balance_constants()
+    settings = parse_default_settings()
 
     results: List[RunResult] = []
     for i in range(10):
         seed = 20260324 + i * 97
         # per-run bomb damage copy (includes run-local permanent upgrades)
         run_bomb_damage = dict(base_bomb_damage)
-        r = run_once(i + 1, seed, levels, grid_sizes, run_bomb_damage, constants)
+        r = run_once(i + 1, seed, levels, grid_sizes, run_bomb_damage, constants, settings)
         results.append(r)
 
     summary = summarize(results)
@@ -562,7 +644,7 @@ def main() -> None:
         "runs": [asdict(r) for r in results],
         "assumptions": {
             "engine_cli": "godot CLI unavailable in current environment; used formula-driven Monte Carlo simulation",
-            "difficulty": "mine_difficulty=1.0, boss_hp_mult=1.0",
+            "difficulty": "uses default GameSettings mine_difficulty/boss_hp_mult parsed from script",
             "scope": "uses current script constants and helper formulas from LevelData/GameManager/GridManager/BossGrid/ExplosionCalc/BombRegistry",
         },
     }
@@ -573,16 +655,28 @@ def main() -> None:
     lines.append("")
     lines.append("## 总体")
     lines.append(f"- 局数: {summary['runs']}")
-    lines.append(f"- 平均通关层数: {summary['avg_floors_cleared']:.2f}（范围 {summary['min_floors_cleared']} ~ {summary['max_floors_cleared']}）")
+    lines.append(f"- 平均通关层数: {summary['avg_floors_cleared']:.2f}（范围 {summary['min_floors_cleared']} ~ {summary['max_floors_cleared']}，σ={summary['stddev_floors_cleared']:.2f}）")
+    lines.append(f"- 层数四分位: P25={summary['p25_floors_cleared']:.1f}  P50={summary['p50_floors_cleared']:.1f}  P75={summary['p75_floors_cleared']:.1f}")
     lines.append(f"- 平均总回合数: {summary['avg_turns']:.2f}")
     lines.append(f"- 平均单回合伤害: {summary['avg_turn_damage']:.2f}")
     lines.append(f"- 平均点击盈亏/回合: {summary['avg_click_delta_per_turn']:.3f}")
     lines.append(f"- 平均情报盈亏/回合: {summary['avg_intel_delta_per_turn']:.3f}")
+    lines.append(f"- 平均剩余HP: {summary['avg_ending_hp']:.1f}")
+    lines.append(f"- 通关局数: {summary['win_count']}/{summary['runs']}")
+    lines.append("")
+    lines.append("## 层数分布")
+    for tier, count in summary['floor_tiers'].items():
+        bar = '█' * count
+        lines.append(f"- {tier:>8} 层: {bar} ({count}局)")
+    lines.append("")
+    lines.append("## 死亡原因")
+    for reason, count in summary['death_reasons'].items():
+        lines.append(f"- {reason}: {count}局")
     lines.append("")
     lines.append("## 分局明细")
     for r in results:
         lines.append(
-            f"- Run {r.run_id:02d} | seed={r.seed} | floors={r.floors_cleared} | turns={r.turns} | avg_dmg={r.avg_turn_damage:.2f} | click_delta={r.avg_click_delta_per_turn:.3f} | intel_delta={r.avg_intel_delta_per_turn:.3f} | hp={r.ending_hp}"
+            f"- Run {r.run_id:02d} | seed={r.seed} | floors={r.floors_cleared} | turns={r.turns} | avg_dmg={r.avg_turn_damage:.2f} | click_delta={r.avg_click_delta_per_turn:.3f} | intel_delta={r.avg_intel_delta_per_turn:.3f} | hp={r.ending_hp} | end={r.death_reason}"
         )
     lines.append("")
     lines.append("## 说明")
