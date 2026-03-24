@@ -1,5 +1,0 @@
-res://scripts/boss/ExplosionCalc.gd
-res://scripts/bombs/BombRegistry.gd
-res://scripts/boss/BossGrid.gd
-res://scripts/core/GameManager.gd
-res://scripts/core/GridManager.gd
